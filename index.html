@@ -493,198 +493,471 @@ let fishY=50, fishVY=0, playerY=70, isHoldingReel=false;
 let playerBarSize=22, fishSpeed=1.2;
 
 
-// ===== ระบบเสียง (Web Audio API) =====
+// ===== ระบบเสียง v2 (สังเคราะห์ด้วย Web Audio ทั้งหมด ไม่ใช้ไฟล์เสียง) =====
 let audioCtx = null;
 let soundEnabled = true;
-let ambientNodes = []; // เก็บ node บรรยากาศที่กำลังเล่น
+let ambientNodes = [];   // เลเยอร์เสียงต่อเนื่อง
+let ambientTimers = [];  // ตัวสุ่มเสียงเหตุการณ์ (นกร้อง น้ำหยด ฟ้าร้อง ฯลฯ)
+let masterBus = null, reverbSend = null;
+const _noiseCache = {};
 
 function ensureAudio(){
   if(!audioCtx){
-    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); buildBus(); }
+    catch(e){ audioCtx = null; }
   }
   if(audioCtx && audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
-function playTone(freq, dur, type, vol, slide){
-  if(!soundEnabled) return;
-  const ctx = ensureAudio(); if(!ctx) return;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = type || "sine";
-  osc.frequency.setValueAtTime(freq, ctx.currentTime);
-  if(slide) osc.frequency.linearRampToValueAtTime(slide, ctx.currentTime + dur);
-  gain.gain.setValueAtTime(vol || 0.15, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.start(); osc.stop(ctx.currentTime + dur);
+function buildBus(){
+  const c = audioCtx;
+  masterBus = c.createGain(); masterBus.gain.value = 0.9;
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = -20; comp.knee.value = 18; comp.ratio.value = 6;
+  comp.attack.value = 0.004; comp.release.value = 0.25;
+  masterBus.connect(comp); comp.connect(c.destination);
+  // รีเวิร์บ (ก้องถ้ำ/ทะเล) สร้างจากสัญญาณรบกวนที่ค่อยๆ เบาลง
+  const len = Math.floor(c.sampleRate * 2.4), ir = c.createBuffer(2, len, c.sampleRate);
+  for(let ch = 0; ch < 2; ch++){
+    const d = ir.getChannelData(ch);
+    for(let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.8);
+  }
+  const conv = c.createConvolver(); conv.buffer = ir;
+  const wet = c.createGain(); wet.gain.value = 0.45;
+  reverbSend = c.createGain();
+  reverbSend.connect(conv); conv.connect(wet); wet.connect(masterBus);
 }
-function playNoise(dur, vol){
-  if(!soundEnabled) return;
-  const ctx = ensureAudio(); if(!ctx) return;
-  const bufferSize = ctx.sampleRate * dur;
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for(let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * Math.pow(1-i/bufferSize, 2);
-  const src = ctx.createBufferSource();
-  const gain = ctx.createGain();
-  src.buffer = buffer;
-  gain.gain.setValueAtTime(vol || 0.1, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-  src.connect(gain); gain.connect(ctx.destination);
-  src.start();
+function out(node, wet){
+  node.connect(masterBus);
+  if(wet > 0){ const s = audioCtx.createGain(); s.gain.value = wet; node.connect(s); s.connect(reverbSend); }
+}
+function noiseBuf(kind){
+  if(_noiseCache[kind]) return _noiseCache[kind];
+  const c = audioCtx, n = c.sampleRate * 3, b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
+  if(kind === "white"){
+    for(let i = 0; i < n; i++) d[i] = Math.random()*2-1;
+  } else if(kind === "pink"){
+    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+    for(let i = 0; i < n; i++){
+      const w = Math.random()*2-1;
+      b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759; b2=0.969*b2+w*0.153852;
+      b3=0.8665*b3+w*0.3104856; b4=0.55*b4+w*0.5329522; b5=-0.7616*b5-w*0.016898;
+      d[i]=(b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11; b6=w*0.115926;
+    }
+  } else { // brown
+    let l = 0;
+    for(let i = 0; i < n; i++){ const w = Math.random()*2-1; l = (l + 0.02*w)/1.02; d[i] = l*3.5; }
+  }
+  return (_noiseCache[kind] = b);
 }
 
-// สร้าง noise loop สำหรับบรรยากาศ
-function createNoiseLoop(vol, filterFreq, filterType){
-  const ctx = ensureAudio(); if(!ctx) return null;
-  const bufferSize = ctx.sampleRate * 2;
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for(let i=0;i<bufferSize;i++) data[i] = Math.random()*2-1;
-  const src = ctx.createBufferSource();
-  src.buffer = buffer;
-  src.loop = true;
-  const filter = ctx.createBiquadFilter();
-  filter.type = filterType || "lowpass";
-  filter.frequency.value = filterFreq || 800;
-  const gain = ctx.createGain();
-  gain.gain.value = vol || 0.03;
-  src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
-  src.start();
-  return {src, gain, filter};
+// ---- เสียงสั้น ----
+function tone(f, dur, o){
+  o = o || {};
+  if(!soundEnabled) return;
+  const c = ensureAudio(); if(!c) return;
+  const t = c.currentTime + (o.delay || 0);
+  const osc = c.createOscillator(); osc.type = o.type || "sine";
+  osc.frequency.setValueAtTime(f, t);
+  if(o.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.slide), t + dur);
+  if(o.detune) osc.detune.value = o.detune;
+  const g = c.createGain(), a = o.attack || 0.005, v = o.vol || 0.1;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(v, t + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(dur, a + 0.01));
+  osc.connect(g); out(g, o.wet || 0);
+  osc.start(t); osc.stop(t + dur + 0.05);
 }
-function createToneLoop(freq, type, vol){
-  const ctx = ensureAudio(); if(!ctx) return null;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = type || "sine";
-  osc.frequency.value = freq;
-  gain.gain.value = vol || 0.02;
-  osc.connect(gain); gain.connect(ctx.destination);
+function hit(dur, o){
+  o = o || {};
+  if(!soundEnabled) return;
+  const c = ensureAudio(); if(!c) return;
+  const t = c.currentTime + (o.delay || 0);
+  const src = c.createBufferSource(); src.buffer = noiseBuf(o.kind || "white");
+  const f = c.createBiquadFilter(); f.type = o.type || "bandpass";
+  f.frequency.setValueAtTime(o.freq || 1000, t); f.Q.value = o.q || 1;
+  if(o.sweep) f.frequency.exponentialRampToValueAtTime(Math.max(40, o.sweep), t + dur);
+  const g = c.createGain(), a = o.attack || 0.003;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(o.vol || 0.1, t + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(dur, a + 0.01));
+  src.connect(f); f.connect(g); out(g, o.wet || 0);
+  src.start(t, Math.random()*2); src.stop(t + dur + 0.05);
+}
+function bell(f, vol, o){
+  o = o || {};
+  const P = [[1, 1, 1.8], [2.76, 0.45, 1.1], [5.4, 0.22, 0.6]];
+  P.forEach(function(p){
+    tone(f*p[0], (o.len || 1) * p[2], {vol: vol*p[1], wet: o.wet == null ? 0.5 : o.wet, delay: o.delay || 0, attack: 0.003});
+  });
+}
+const _PENTA = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5];
+function chime(vol, wet){ bell(_PENTA[Math.floor(Math.random()*_PENTA.length)], vol || 0.04, {wet: wet == null ? 0.8 : wet, len: 1.3}); }
+// เข้ากันได้กับโค้ดเดิม
+function playTone(freq, dur, type, vol, slide){ tone(freq, dur, {type: type, vol: vol, slide: slide}); }
+function playNoise(dur, vol){ hit(dur, {type: "lowpass", freq: 2500, vol: vol}); }
+
+// ---- เสียงธรรมชาติ/เหตุการณ์ ----
+function splash(size){
+  size = size || 1;
+  hit(0.4, {type: "bandpass", freq: 2200, sweep: 500, q: 0.7, vol: 0.13*size, wet: 0.2});
+  tone(150, 0.2, {slide: 55, vol: 0.14*size});
+  const n = 2 + Math.floor(Math.random()*3);
+  for(let i = 0; i < n; i++){
+    const f = 900 + Math.random()*1400;
+    tone(f, 0.06, {slide: f*1.8, vol: 0.04*size, delay: 0.05 + i*0.07 + Math.random()*0.04, wet: 0.3});
+  }
+}
+function plop(){ const f = 260 + Math.random()*220; tone(f, 0.09, {slide: f*2.6, vol: 0.09, wet: 0.2}); }
+function drip(wet){ const f = 800 + Math.random()*700; tone(f, 0.1, {slide: f*0.55, vol: 0.06, wet: wet == null ? 0.7 : wet}); }
+function gull(){
+  const f = 1500 + Math.random()*400;
+  tone(f, 0.22, {type: "triangle", slide: f*0.55, vol: 0.035, wet: 0.4});
+  tone(f*1.05, 0.2, {type: "triangle", slide: f*0.5, vol: 0.03, wet: 0.4, delay: 0.26});
+}
+function birdChirp(){
+  const base = 2200 + Math.random()*1600, n = 2 + Math.floor(Math.random()*3);
+  for(let i = 0; i < n; i++) tone(base*(0.9+Math.random()*0.3), 0.07, {slide: base*(1.2+Math.random()*0.5), vol: 0.025, delay: i*0.1, wet: 0.35});
+}
+function cricket(){
+  for(let i = 0; i < 4; i++) tone(4300, 0.04, {type: "square", vol: 0.008, delay: i*0.07});
+}
+function frog(){
+  const f = 150 + Math.random()*60;
+  tone(f, 0.14, {type: "sawtooth", slide: f*0.7, vol: 0.04, wet: 0.2});
+  tone(f*1.1, 0.12, {type: "sawtooth", slide: f*0.7, vol: 0.035, delay: 0.17, wet: 0.2});
+}
+function thunder(vol){
+  vol = vol || 0.3;
+  hit(2.8, {kind: "brown", type: "lowpass", freq: 320, sweep: 60, vol: vol, attack: 0.12, wet: 0.5});
+  hit(1.6, {kind: "brown", type: "lowpass", freq: 220, sweep: 50, vol: vol*0.7, attack: 0.2, delay: 0.7, wet: 0.5});
+}
+function whaleCall(){
+  const f = 80 + Math.random()*30;
+  tone(f, 3.2, {slide: f*1.7, vol: 0.06, attack: 0.9, wet: 0.85});
+  tone(f*2, 3.0, {slide: f*3.2, vol: 0.025, attack: 1.0, wet: 0.85, delay: 0.1});
+}
+function crackle(vol, lo, hi){
+  const f = (lo || 2500) + Math.random()*((hi || 6000) - (lo || 2500));
+  hit(0.02 + Math.random()*0.04, {type: "bandpass", freq: f, q: 2.5, vol: vol || 0.04});
+}
+function lavaBubble(){
+  const f = 110 + Math.random()*110;
+  tone(f, 0.18, {slide: f*0.5, vol: 0.09, wet: 0.2});
+  hit(0.12, {type: "lowpass", freq: 900, vol: 0.05});
+}
+function iceCrack(){
+  hit(0.12, {type: "highpass", freq: 3500, vol: 0.08, wet: 0.5});
+  tone(2400, 0.05, {type: "square", vol: 0.015, slide: 1400, wet: 0.5});
+}
+function whisper(){
+  const f = 800 + Math.random()*1000;
+  hit(1.4, {kind: "pink", type: "bandpass", freq: f, sweep: f*0.6, q: 7, vol: 0.035, attack: 0.5, wet: 0.85});
+}
+function creak(){
+  const f = 100 + Math.random()*40;
+  tone(f, 0.9, {type: "sawtooth", slide: f*0.7, vol: 0.025, attack: 0.15, wet: 0.5});
+}
+
+// ---- เลเยอร์ต่อเนื่อง ----
+function loopLayer(o){
+  const c = ensureAudio(); if(!c) return null;
+  const src = c.createBufferSource(); src.buffer = noiseBuf(o.kind || "pink"); src.loop = true;
+  const f = c.createBiquadFilter(); f.type = o.type || "lowpass"; f.frequency.value = o.freq || 800; f.Q.value = o.q || 0.7;
+  const g = c.createGain(); g.gain.value = 0;
+  src.connect(f); f.connect(g); out(g, o.wet || 0);
+  const t = c.currentTime;
+  g.gain.linearRampToValueAtTime(o.vol || 0.05, t + 1.6);
+  src.start(t, Math.random()*2);
+  const h = {gain: g, stopList: [src]};
+  if(o.lfoRate){
+    const l = c.createOscillator(); l.frequency.value = o.lfoRate;
+    const lg = c.createGain();
+    if(o.lfoTarget === "freq"){ lg.gain.value = (o.freq || 800) * (o.lfoDepth || 0.4); l.connect(lg); lg.connect(f.frequency); }
+    else { lg.gain.value = (o.vol || 0.05) * (o.lfoDepth || 0.6); l.connect(lg); lg.connect(g.gain); }
+    l.start(); h.stopList.push(l);
+  }
+  ambientNodes.push(h); return h;
+}
+function droneLayer(freq, type, vol, o){
+  o = o || {};
+  const c = ensureAudio(); if(!c) return null;
+  const osc = c.createOscillator(); osc.type = type || "sine"; osc.frequency.value = freq;
+  if(o.detune) osc.detune.value = o.detune;
+  const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = o.cut || 1200;
+  const g = c.createGain(); g.gain.value = 0;
+  osc.connect(f); f.connect(g); out(g, o.wet || 0);
+  g.gain.linearRampToValueAtTime(vol, c.currentTime + 2.2);
   osc.start();
-  return {src: osc, gain};
+  const h = {gain: g, stopList: [osc]};
+  const lfo = c.createOscillator(); lfo.frequency.value = o.lfoRate || (0.12 + Math.random()*0.12);
+  const lg = c.createGain(); lg.gain.value = vol * (o.lfoDepth || 0.4);
+  lfo.connect(lg); lg.connect(g.gain); lfo.start(); h.stopList.push(lfo);
+  ambientNodes.push(h); return h;
 }
+function sched(fn, minMs, maxMs){
+  const h = {t: null, dead: false};
+  const run = function(){
+    if(h.dead) return;
+    h.t = setTimeout(function(){
+      if(h.dead) return;
+      if(soundEnabled && !document.hidden && audioCtx && audioCtx.state === "running"){ try{ fn(); }catch(e){} }
+      run();
+    }, minMs + Math.random()*(maxMs - minMs));
+  };
+  run(); ambientTimers.push(h); return h;
+}
+const _day = fn => function(){ if(isDay) fn(); };
+const _night = fn => function(){ if(!isDay) fn(); };
+
 function stopAmbient(){
-  ambientNodes.forEach(n=>{
-    try{
-      if(n.gain) n.gain.gain.linearRampToValueAtTime(0.001, (audioCtx||ensureAudio()).currentTime + 0.3);
-      setTimeout(()=>{ try{ n.src.stop(); }catch(e){} }, 400);
-    }catch(e){}
+  ambientTimers.forEach(function(h){ h.dead = true; clearTimeout(h.t); });
+  ambientTimers = [];
+  const c = audioCtx;
+  ambientNodes.forEach(function(n){
+    try{ if(c) n.gain.gain.linearRampToValueAtTime(0.0001, c.currentTime + 0.5); }catch(e){}
+    setTimeout(function(){ n.stopList.forEach(function(s){ try{ s.stop(); }catch(e){} }); }, 700);
   });
   ambientNodes = [];
 }
+
 function startAmbient(loc, weather){
   stopAmbient();
   if(!soundEnabled) return;
   const ctx = ensureAudio(); if(!ctx) return;
 
-  // เสียงพื้นฐานตามสถานที่
-  if(loc===0){ // ชายหาด - คลื่นทะเล
-    ambientNodes.push(createNoiseLoop(0.035, 600, "lowpass"));
-    ambientNodes.push(createToneLoop(180, "sine", 0.015));
-  } else if(loc===1){ // เกาะลึกลับ - ลมเบา + นก
-    ambientNodes.push(createNoiseLoop(0.025, 1200, "bandpass"));
-    ambientNodes.push(createToneLoop(320, "triangle", 0.012));
-  } else if(loc===2){ // ทะเลลึก - เสียงทุ้มใต้น้ำ
-    ambientNodes.push(createNoiseLoop(0.04, 300, "lowpass"));
-    ambientNodes.push(createToneLoop(80, "sine", 0.025));
-  } else if(loc===3){ // เกาะลับ - เสียงลึกลับ
-    ambientNodes.push(createNoiseLoop(0.02, 900, "bandpass"));
-    ambientNodes.push(createToneLoop(440, "sine", 0.012));
-    ambientNodes.push(createToneLoop(554, "sine", 0.008));
-  } else if(loc===4){ // ซากใต้น้ำ - ลาวา / เดือด
-    ambientNodes.push(createNoiseLoop(0.04, 400, "lowpass"));
-    ambientNodes.push(createToneLoop(100, "sawtooth", 0.012));
-  } else if(loc===5){ // บึงลึกลับ - แมลง / น้ำนิ่ง
-    ambientNodes.push(createNoiseLoop(0.02, 2000, "highpass"));
-    ambientNodes.push(createToneLoop(250, "sine", 0.01));
-  } else if(loc===6){ // ทะเลน้ำแข็ง - ลมหนาว
-    ambientNodes.push(createNoiseLoop(0.03, 1500, "highpass"));
-    ambientNodes.push(createToneLoop(500, "sine", 0.01));
-  } else if(loc===7){ // มิติมืด - เสียงต่ำน่าขนลุก
-    ambientNodes.push(createNoiseLoop(0.035, 200, "lowpass"));
-    ambientNodes.push(createToneLoop(55, "sine", 0.03));
-    ambientNodes.push(createToneLoop(70, "triangle", 0.01));
-  } else if(loc===8){ // เกาะโบราณ
-    ambientNodes.push(createNoiseLoop(0.025, 500, "lowpass"));
-    ambientNodes.push(createToneLoop(110, "triangle", 0.015));
-    ambientNodes.push(createToneLoop(165, "sine", 0.01));
-  } else if(loc===9){ // ถ้ำน้ำวน
-    ambientNodes.push(createNoiseLoop(0.04, 400, "lowpass"));
-    ambientNodes.push(createToneLoop(90, "sawtooth", 0.02));
-    ambientNodes.push(createToneLoop(140, "sine", 0.015));
-  } else if(loc===10){ // แท่นเสริมพลัง
-    ambientNodes.push(createToneLoop(220, "sine", 0.02));
-    ambientNodes.push(createToneLoop(330, "triangle", 0.012));
-    ambientNodes.push(createNoiseLoop(0.02, 900, "bandpass"));
-  } else if(loc===11){ // เกาะลาวา
-    ambientNodes.push(createNoiseLoop(0.035, 300, "lowpass"));
-    ambientNodes.push(createToneLoop(70, "sawtooth", 0.018));
-    ambientNodes.push(createToneLoop(110, "square", 0.01));
-  } else if(loc===12){ // เกาะสายรุ้ง
-    ambientNodes.push(createToneLoop(440, "sine", 0.012));
-    ambientNodes.push(createToneLoop(554, "sine", 0.01));
-    ambientNodes.push(createToneLoop(659, "triangle", 0.008));
-  } else if(loc===13){ // ออบซิเดียน
-    ambientNodes.push(createNoiseLoop(0.03, 200, "lowpass"));
-    ambientNodes.push(createToneLoop(55, "sawtooth", 0.02));
-    ambientNodes.push(createToneLoop(82, "square", 0.01));
-  } else if(loc===14){ // ทะเลเมฆ
-    ambientNodes.push(createNoiseLoop(0.02, 800, "lowpass"));
-    ambientNodes.push(createToneLoop(180, "sine", 0.015));
-    ambientNodes.push(createToneLoop(240, "triangle", 0.01));
-  } else {
-    ambientNodes.push(createNoiseLoop(0.025, 700, "lowpass"));
+  switch(loc){
+  case 0: // ชายหาด: คลื่นซัด ฟองคลื่น นกนางนวล จิ้งหรีดตอนกลางคืน
+    loopLayer({kind:"pink", type:"lowpass", freq:700, vol:0.10, lfoRate:0.11, lfoDepth:0.75, wet:0.15});
+    loopLayer({kind:"white", type:"highpass", freq:3200, vol:0.022, lfoRate:0.11, lfoDepth:0.9});
+    loopLayer({kind:"pink", type:"bandpass", freq:500, q:1.5, vol:0.025, lfoRate:0.07, lfoDepth:0.5});
+    sched(_day(gull), 7000, 15000);
+    sched(_night(cricket), 1500, 3500);
+    break;
+  case 1: // เกาะลึกลับ: ลมเบา นก/กบ น้ำหยด ระฆังไกลๆ
+    loopLayer({kind:"pink", type:"bandpass", freq:520, q:1.2, vol:0.05, lfoRate:0.09, lfoDepth:0.6});
+    loopLayer({kind:"pink", type:"lowpass", freq:420, vol:0.04, lfoRate:0.13, lfoDepth:0.7});
+    droneLayer(196, "sine", 0.012, {wet:0.6});
+    sched(_day(birdChirp), 3500, 9000);
+    sched(_night(frog), 2500, 6000);
+    sched(function(){ drip(0.6); }, 4000, 9000);
+    sched(function(){ chime(0.035, 0.85); }, 9000, 18000);
+    break;
+  case 2: // ทะเลลึก: แรงดันน้ำทุ้ม เสียงวาฬ ฟองอากาศ โซนาร์
+    loopLayer({kind:"brown", type:"lowpass", freq:170, vol:0.13, lfoRate:0.07, lfoDepth:0.5, wet:0.3});
+    droneLayer(55, "sine", 0.035, {wet:0.5, cut:300});
+    sched(whaleCall, 16000, 30000);
+    sched(plop, 1500, 4000);
+    sched(function(){ tone(1180, 0.5, {vol: 0.03, wet: 0.9}); }, 22000, 40000);
+    break;
+  case 3: // เกาะลับ: ลมแผ่ว เสียงประสานลึกลับ ระฆังคริสตัล
+    loopLayer({kind:"pink", type:"bandpass", freq:900, q:0.9, vol:0.035, lfoRate:0.08, lfoDepth:0.6});
+    droneLayer(220, "sine", 0.012, {wet:0.8, detune:-6});
+    droneLayer(330, "triangle", 0.008, {wet:0.8, detune:7});
+    sched(function(){ chime(0.045, 0.85); }, 2500, 6500);
+    sched(_night(function(){ tone(2600 + Math.random()*1200, 0.4, {vol: 0.015, wet: 0.9}); }), 3000, 7000);
+    break;
+  case 4: // ซากใต้น้ำ: เสียงอู้อี้ใต้น้ำ เหล็กเอี๊ยด ฟองอากาศ
+    loopLayer({kind:"brown", type:"lowpass", freq:260, vol:0.11, lfoRate:0.09, lfoDepth:0.5, wet:0.35});
+    loopLayer({kind:"pink", type:"bandpass", freq:300, q:2, vol:0.025, lfoRate:0.15, lfoDepth:0.6, wet:0.3});
+    sched(creak, 7000, 15000);
+    sched(plop, 1800, 4500);
+    sched(function(){ bell(110, 0.07, {wet: 0.8, len: 1.6}); }, 14000, 26000);
+    break;
+  case 5: // บึงลึกลับ: แมลง กบ น้ำเอื่อย
+    loopLayer({kind:"pink", type:"lowpass", freq:380, vol:0.04, lfoRate:0.1, lfoDepth:0.5});
+    loopLayer({kind:"white", type:"highpass", freq:5200, vol:0.012, lfoRate:7, lfoDepth:0.7});
+    sched(frog, 1800, 4800);
+    sched(function(){ drip(0.4); }, 3000, 7000);
+    sched(_day(birdChirp), 6000, 14000);
+    sched(_night(cricket), 900, 2200);
+    break;
+  case 6: // ทะเลน้ำแข็ง: ลมหวีดหนาว น้ำแข็งแตก ระฆังน้ำแข็ง
+    loopLayer({kind:"pink", type:"bandpass", freq:650, q:3, vol:0.075, lfoRate:0.15, lfoDepth:0.5, lfoTarget:"freq"});
+    loopLayer({kind:"white", type:"highpass", freq:4200, vol:0.018, lfoRate:0.1, lfoDepth:0.8});
+    sched(iceCrack, 5000, 12000);
+    sched(function(){ bell(2093, 0.03, {wet: 0.9, len: 1.4}); }, 9000, 19000);
+    break;
+  case 7: // มิติมืด: เสียงต่ำน่ากลัว กระซิบ หัวใจเต้น
+    droneLayer(41, "sawtooth", 0.025, {cut:180, wet:0.5});
+    droneLayer(61.5, "sine", 0.03, {wet:0.6});
+    loopLayer({kind:"brown", type:"lowpass", freq:140, vol:0.08, lfoRate:0.05, lfoDepth:0.6});
+    sched(whisper, 5000, 11000);
+    sched(function(){ tone(80, 2.6, {slide: 320, vol: 0.04, attack: 2.0, wet: 0.8}); }, 12000, 24000);
+    sched(function(){ tone(55, 0.22, {vol: 0.12}); tone(55, 0.22, {vol: 0.09, delay: 0.3}); }, 8000, 14000);
+    break;
+  case 8: // เกาะโบราณ: ลมทะเลทราย ฆ้องไกลๆ ไฟคบเพลิง
+    loopLayer({kind:"pink", type:"bandpass", freq:700, q:1.4, vol:0.07, lfoRate:0.09, lfoDepth:0.6});
+    loopLayer({kind:"pink", type:"lowpass", freq:350, vol:0.035, lfoRate:0.12, lfoDepth:0.6});
+    sched(function(){ crackle(0.022, 2500, 7000); }, 350, 1400);
+    sched(function(){ bell(98, 0.09, {wet: 0.85, len: 2.2}); }, 14000, 26000);
+    sched(function(){ chime(0.03, 0.8); }, 8000, 15000);
+    break;
+  case 9: // ถ้ำน้ำวน: น้ำวน หยดก้อง ความก้องของถ้ำ
+    loopLayer({kind:"pink", type:"bandpass", freq:340, q:1, vol:0.08, lfoRate:0.22, lfoDepth:0.7, wet:0.45});
+    loopLayer({kind:"white", type:"bandpass", freq:650, q:0.8, vol:0.028, lfoRate:0.26, lfoDepth:0.9, wet:0.4});
+    loopLayer({kind:"brown", type:"lowpass", freq:130, vol:0.06, lfoRate:0.06, lfoDepth:0.5, wet:0.4});
+    sched(function(){ drip(0.9); }, 1000, 3200);
+    break;
+  case 10: // แท่นเสริมพลัง: คอรัสพลัง ไฟฟ้าสถิต ระฆัง
+    droneLayer(130.8, "sine", 0.016, {wet:0.7, detune:-5});
+    droneLayer(196, "sine", 0.013, {wet:0.7, detune:4});
+    droneLayer(261.6, "triangle", 0.008, {wet:0.7});
+    loopLayer({kind:"pink", type:"lowpass", freq:300, vol:0.03, lfoRate:0.1, lfoDepth:0.6});
+    sched(function(){ hit(0.07, {type:"highpass", freq:4500, vol:0.05, wet:0.4}); }, 1500, 5000);
+    sched(function(){ chime(0.04, 0.85); }, 3500, 8000);
+    break;
+  case 11: // เกาะลาวา: เสียงคำรามลาวา ไฟปะทุ ฟองลาวา
+    loopLayer({kind:"brown", type:"lowpass", freq:210, vol:0.12, lfoRate:0.14, lfoDepth:0.5, wet:0.2});
+    droneLayer(55, "sine", 0.03, {cut:200});
+    loopLayer({kind:"pink", type:"bandpass", freq:1100, q:0.8, vol:0.02, lfoRate:0.2, lfoDepth:0.7});
+    sched(function(){ crackle(0.05, 2200, 6500); }, 150, 650);
+    sched(lavaBubble, 1000, 3200);
+    sched(function(){ thunder(0.12); }, 22000, 45000);
+    break;
+  case 12: // เกาะสายรุ้ง: เสียงประสานสดใส กระดิ่งลม นก
+    droneLayer(261.6, "sine", 0.012, {wet:0.7, detune:-4});
+    droneLayer(329.6, "sine", 0.01, {wet:0.7, detune:5});
+    droneLayer(392, "triangle", 0.007, {wet:0.7});
+    loopLayer({kind:"pink", type:"bandpass", freq:900, q:0.9, vol:0.02, lfoRate:0.08, lfoDepth:0.6});
+    sched(function(){ chime(0.05, 0.75); }, 1400, 3800);
+    sched(_day(birdChirp), 4000, 9000);
+    break;
+  case 13: // ออบซิเดียน: ลมหวีดหุบเขา หินแตก พลังม่วง
+    loopLayer({kind:"pink", type:"bandpass", freq:320, q:4, vol:0.085, lfoRate:0.08, lfoDepth:0.5, lfoTarget:"freq"});
+    droneLayer(49, "sawtooth", 0.014, {cut:160, wet:0.5});
+    droneLayer(110, "sine", 0.01, {wet:0.6, lfoRate:4.5, lfoDepth:0.5});
+    sched(function(){ hit(0.28, {type:"lowpass", freq:420, vol:0.12, wet:0.6}); }, 8000, 16000);
+    sched(function(){ thunder(0.14); }, 20000, 40000);
+    break;
+  case 14: // ทะเลเมฆ: ลมสูงเบาบาง เสียงประสานสวรรค์ กระดิ่ง
+    loopLayer({kind:"pink", type:"bandpass", freq:1200, q:0.8, vol:0.045, lfoRate:0.1, lfoDepth:0.6});
+    loopLayer({kind:"white", type:"highpass", freq:5000, vol:0.012, lfoRate:0.07, lfoDepth:0.9});
+    droneLayer(329.6, "sine", 0.01, {wet:0.8, detune:-5});
+    droneLayer(440, "sine", 0.008, {wet:0.8, detune:6});
+    sched(function(){ chime(0.04, 0.85); }, 3000, 7000);
+    sched(_day(gull), 9000, 18000);
+    break;
+  default:
+    loopLayer({kind:"pink", type:"lowpass", freq:700, vol:0.06, lfoRate:0.1, lfoDepth:0.6});
   }
 
   // สภาพอากาศทับซ้อน
-  if(weather === 1){ // ฝน
-    ambientNodes.push(createNoiseLoop(0.05, 3000, "highpass"));
-  }
-  if(weather === 2){ // ลมแรง
-    ambientNodes.push(createNoiseLoop(0.04, 800, "bandpass"));
-    ambientNodes.push(createToneLoop(150, "sine", 0.015));
+  if(weather === 1){ // ฝนตก: ฝนพรำ หยดฝน ฟ้าร้องไกลๆ
+    loopLayer({kind:"white", type:"highpass", freq:3600, vol:0.05});
+    loopLayer({kind:"pink", type:"bandpass", freq:1300, q:0.7, vol:0.04});
+    sched(function(){ hit(0.03, {type:"bandpass", freq:3500 + Math.random()*3500, q:3, vol:0.03}); }, 70, 260);
+    sched(function(){ thunder(0.22); }, 18000, 40000);
+  } else if(weather === 2){ // ลมแรง: ลมหวีดแรง
+    loopLayer({kind:"pink", type:"bandpass", freq:520, q:2, vol:0.09, lfoRate:0.15, lfoDepth:0.6, lfoTarget:"freq"});
+    loopLayer({kind:"white", type:"bandpass", freq:1600, q:8, vol:0.015, lfoRate:0.22, lfoDepth:0.9});
+  } else if(weather === 3){ // ออโรร่า: ประกายเสียงมหัศจรรย์
+    droneLayer(432, "sine", 0.012, {wet:0.9, detune:-5});
+    droneLayer(648, "sine", 0.008, {wet:0.9, detune:6});
+    sched(function(){ chime(0.05, 0.9); }, 1800, 4800);
   }
 }
 
+// ---- เอฟเฟกต์ตอนเล่น ----
 const SFX = {
-  cast(){ playTone(400, 0.15, "triangle", 0.12, 200); playNoise(0.2, 0.06); },
-  bite(){ playTone(600, 0.1, "square", 0.1); setTimeout(()=>playTone(800, 0.1, "square", 0.1), 80); },
-  bossBite(){ playTone(200, 0.2, "sawtooth", 0.15, 100); setTimeout(()=>playTone(150, 0.3, "sawtooth", 0.12), 150); },
-  reel(){ playTone(300 + Math.random()*100, 0.05, "triangle", 0.06); },
-  catch(){ playTone(523, 0.12, "sine", 0.15); setTimeout(()=>playTone(659, 0.12, "sine", 0.15), 100); setTimeout(()=>playTone(784, 0.2, "sine", 0.15), 200); },
-  bossCatch(){ playTone(400, 0.15, "sine", 0.18); setTimeout(()=>playTone(500, 0.15, "sine", 0.18), 120); setTimeout(()=>playTone(600, 0.15, "sine", 0.18), 240); setTimeout(()=>playTone(800, 0.3, "sine", 0.2), 360); },
-  fail(){ playTone(300, 0.2, "sawtooth", 0.1, 100); playNoise(0.25, 0.08); },
-  travel(){ playTone(250, 0.3, "sine", 0.1, 400); playNoise(0.4, 0.05); },
-  arrive(){ playTone(440, 0.1, "sine", 0.12); setTimeout(()=>playTone(554, 0.15, "sine", 0.12), 100); },
-  sell(){ playTone(800, 0.08, "sine", 0.1); setTimeout(()=>playTone(1000, 0.1, "sine", 0.1), 70); },
-  buy(){ playTone(600, 0.1, "triangle", 0.12); setTimeout(()=>playTone(900, 0.15, "triangle", 0.12), 90); },
-  levelup(){ playTone(523, 0.1, "sine", 0.15); setTimeout(()=>playTone(659, 0.1, "sine", 0.15), 100); setTimeout(()=>playTone(784, 0.1, "sine", 0.15), 200); setTimeout(()=>playTone(1046, 0.25, "sine", 0.18), 300); },
-  click(){ playTone(700, 0.04, "square", 0.05); },
-  ambient(loc){ startAmbient(loc, currentWeather); },
-  hammer(){ playTone(80, 0.12, "sawtooth", 0.2, 40); playNoise(0.15, 0.12); setTimeout(()=>playTone(60, 0.1, "square", 0.15), 50); },
-  trident(){
-    // เสียงฟันแหลมคม แสบหู
-    playTone(2400, 0.045, "square", 0.14, 900);
-    playTone(3200, 0.035, "sawtooth", 0.1, 1400);
-    playTone(1800, 0.05, "triangle", 0.08, 700);
-    // เสียงเสียดโลหะสั้นๆ
-    if(!soundEnabled) return;
-    const ctx = ensureAudio(); if(!ctx) return;
-    const n = ctx.sampleRate * 0.08;
-    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for(let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/n, 1.5);
-    const src = ctx.createBufferSource(); src.buffer = buf;
-    const bp = ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=2800; bp.Q.value=4;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.18, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.08);
-    src.connect(bp); bp.connect(g); g.connect(ctx.destination);
-    src.start();
+  cast(){
+    hit(0.35, {type:"bandpass", freq:400, sweep:2600, q:1.2, vol:0.1, attack:0.05});
+    tone(1800, 0.25, {type:"triangle", slide:600, vol:0.03});
+    setTimeout(function(){ splash(0.8); }, 420);
   },
-  voidSuck(){ playTone(200, 0.25, "sawtooth", 0.15, 50); playNoise(0.2, 0.1); setTimeout(()=>playTone(100, 0.2, "sine", 0.12, 30), 80); }
+  bite(){
+    plop();
+    tone(988, 0.09, {type:"triangle", vol:0.08, delay:0.02});
+    tone(1319, 0.12, {type:"triangle", vol:0.08, delay:0.1});
+  },
+  bossBite(){
+    hit(1.2, {kind:"brown", type:"lowpass", freq:260, sweep:70, vol:0.3, attack:0.05, wet:0.4});
+    tone(70, 0.8, {type:"sawtooth", slide:40, vol:0.18, wet:0.3});
+    bell(110, 0.14, {wet:0.7, len:1.3});
+    bell(110, 0.12, {wet:0.7, len:1.3, delay:0.35});
+  },
+  reel(){
+    hit(0.025, {type:"highpass", freq:3000, vol:0.05});
+    tone(330 + Math.random()*120, 0.03, {type:"square", vol:0.025});
+  },
+  catch(){
+    splash(1);
+    bell(784, 0.07, {delay:0.12, wet:0.5});
+    bell(988, 0.07, {delay:0.22, wet:0.5});
+    bell(1319, 0.08, {delay:0.32, wet:0.6, len:1.3});
+  },
+  bossCatch(){
+    splash(1.4);
+    [[392,0.1],[494,0.22],[587,0.34],[784,0.48]].forEach(function(n){
+      tone(n[0], 0.3, {type:"sawtooth", vol:0.06, delay:n[1], wet:0.4});
+      tone(n[0], 0.35, {type:"sine", vol:0.1, delay:n[1], wet:0.4});
+    });
+    bell(1046, 0.09, {delay:0.6, wet:0.7, len:1.8});
+    bell(1568, 0.07, {delay:0.72, wet:0.8, len:1.8});
+  },
+  fail(){
+    hit(0.06, {type:"highpass", freq:4000, vol:0.12});
+    tone(600, 0.3, {type:"sawtooth", slide:140, vol:0.06, delay:0.04});
+    tone(330, 0.35, {type:"triangle", slide:110, vol:0.07, delay:0.18, wet:0.2});
+  },
+  travel(){
+    hit(0.9, {kind:"pink", type:"lowpass", freq:600, sweep:1500, vol:0.12, attack:0.2});
+    tone(110, 0.8, {type:"sawtooth", slide:165, vol:0.03, attack:0.2});
+    setTimeout(function(){ splash(0.5); }, 450);
+    setTimeout(function(){ splash(0.4); }, 800);
+  },
+  arrive(){
+    bell(659, 0.07, {wet:0.6});
+    bell(880, 0.07, {delay:0.15, wet:0.6, len:1.4});
+    setTimeout(gull, 300);
+  },
+  sell(){
+    tone(2093, 0.14, {type:"triangle", vol:0.035, wet:0.2});
+    tone(3136, 0.22, {type:"triangle", vol:0.028, delay:0.07, wet:0.3});
+    hit(0.05, {type:"highpass", freq:6000, vol:0.02, delay:0.06});
+  },
+  buy(){
+    hit(0.03, {type:"highpass", freq:2500, vol:0.05});
+    tone(1568, 0.1, {type:"triangle", vol:0.06, delay:0.03});
+    tone(1175, 0.1, {type:"triangle", vol:0.06, delay:0.1});
+    bell(1568, 0.06, {delay:0.18, wet:0.5});
+  },
+  levelup(){
+    [523, 659, 784, 1046].forEach(function(f, i){ bell(f, 0.08, {delay: i*0.1, wet:0.6, len:1.2}); });
+    bell(1568, 0.08, {delay:0.5, wet:0.8, len:2});
+    for(let i = 0; i < 5; i++) tone(2500 + Math.random()*2500, 0.1, {vol:0.02, delay:0.5 + i*0.07, wet:0.7});
+  },
+  click(){
+    tone(520, 0.03, {type:"triangle", vol:0.04});
+    hit(0.02, {type:"highpass", freq:4000, vol:0.02});
+  },
+  ambient(loc){ startAmbient(loc, currentWeather); },
+  hammer(){
+    tone(70, 0.4, {slide:28, vol:0.3, wet:0.2});
+    hit(0.3, {kind:"brown", type:"lowpass", freq:700, sweep:150, vol:0.25, wet:0.3});
+    bell(196, 0.09, {wet:0.6, len:1.2, delay:0.04});
+  },
+  trident(){
+    hit(0.12, {type:"highpass", freq:3000, sweep:8000, vol:0.14});
+    bell(2200, 0.06, {wet:0.3, len:0.6});
+    tone(1800, 0.08, {type:"sawtooth", slide:700, vol:0.05});
+  },
+  voidSuck(){
+    tone(300, 0.85, {type:"sawtooth", slide:40, vol:0.12, wet:0.5});
+    hit(0.85, {kind:"pink", type:"bandpass", freq:3000, sweep:200, q:1.5, vol:0.15});
+    tone(45, 0.5, {vol:0.2, delay:0.4});
+  }
 };
+// ให้เสียงทำงานเมื่อกลับมาที่แท็บ และหยุดเมื่อซ่อนแท็บ (ประหยัดแบต)
+document.addEventListener("visibilitychange", function(){
+  if(!audioCtx) return;
+  if(document.hidden) audioCtx.suspend().catch(function(){});
+  else if(soundEnabled) audioCtx.resume().catch(function(){});
+});
+["pointerdown","keydown","touchstart"].forEach(function(ev){
+  document.addEventListener(ev, function(){ if(audioCtx && audioCtx.state === "suspended" && !document.hidden && soundEnabled) audioCtx.resume(); }, {passive:true});
+});
+
 const weatherInfo=document.getElementById('weatherInfo');
 
 // ===== ระบบภาษา =====
