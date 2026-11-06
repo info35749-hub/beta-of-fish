@@ -2467,6 +2467,478 @@ function drawIslandLight(loc){
   }
 }
 
+// ===== ROD ART v2: คันเบ็ดละเอียด ลวดลาย วัสดุ ปลายคัน และเอฟเฟกต์เฉพาะรุ่น =====
+function _rgb(h){
+  h = String(h || "#888").replace("#", "");
+  if(h.length === 3) h = h.split("").map(function(c){ return c + c; }).join("");
+  return [parseInt(h.slice(0,2),16)||0, parseInt(h.slice(2,4),16)||0, parseInt(h.slice(4,6),16)||0];
+}
+function _mix(h, to, a){
+  const c = _rgb(h);
+  return "rgb(" + Math.round(c[0]+(to[0]-c[0])*a) + "," + Math.round(c[1]+(to[1]-c[1])*a) + "," + Math.round(c[2]+(to[2]-c[2])*a) + ")";
+}
+const _lite = (h, a) => _mix(h, [255,255,255], a);
+const _dark = (h, a) => _mix(h, [0,0,0], a);
+function _rgba(h, a){ const c = _rgb(h); return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")"; }
+
+const ROD_STYLE = {
+  0:{mat:"wood",tip:"knot",grip:"rope",bands:0},
+  1:{mat:"iron",tip:"ring",grip:"leather",bands:2},
+  2:{mat:"silver",tip:"orb",grip:"leather",bands:2,fx:["sparkle"]},
+  3:{mat:"gold",tip:"crown",grip:"gold",bands:3,fx:["sparkle"]},
+  4:{mat:"gem",tip:"diamond",grip:"leather",bands:3,fx:["sparkle"]},
+  5:{mat:"crystal",tip:"crystal",grip:"leather",bands:2,fx:["sparkle"]},
+  6:{mat:"scale",tip:"horn",grip:"scale",bands:2,fx:["ember"]},
+  7:{mat:"rune",tip:"star",grip:"gold",bands:3,fx:["sparkle"]},
+  8:{mat:"gold",tip:"halo",grip:"gold",bands:3,fx:["rays","sparkle"]},
+  10:{mat:"crystal",tip:"orb",grip:"leather",bands:2,fx:["sparkle"]},
+  11:{mat:"wood",tip:"shell",grip:"rope",bands:1,fx:["bubble"]},
+  12:{mat:"leaf",tip:"leaf",grip:"rope",bands:1,fx:["firefly"]},
+  13:{mat:"sea",tip:"lure",grip:"leather",bands:2,fx:["bubble"]},
+  14:{mat:"iron",tip:"anchor",grip:"rope",bands:2,fx:["bubble"]},
+  15:{mat:"wood",tip:"wave",grip:"rope",bands:1,fx:["dust"]},
+  16:{mat:"gold",tip:"sun",grip:"gold",bands:2,fx:["sparkle"]},
+  17:{mat:"coral",tip:"coral",grip:"rope",bands:2,fx:["bubble"]},
+  18:{mat:"sea",tip:"bolt",grip:"leather",bands:2,fx:["bolt"]},
+  19:{mat:"dark",tip:"crescent",grip:"leather",bands:2,fx:["void"]},
+  20:{mat:"dark",tip:"eye",grip:"leather",bands:3,fx:["void"]},
+  21:{mat:"silver",tip:"crescent",grip:"leather",bands:3,fx:["sparkle"]},
+  22:{mat:"dark",tip:"moonring",grip:"leather",bands:3,fx:["sparkle","void"]},
+  23:{mat:"lava",tip:"flame",grip:"scale",bands:2,fx:["ember"]},
+  24:{mat:"lava",tip:"fireHorns",grip:"scale",bands:3,fx:["ember"]},
+  25:{mat:"sea",tip:"wave",grip:"leather",bands:3,fx:["bubble"]},
+  26:{mat:"gold",tip:"star",grip:"gold",bands:3,fx:["sparkle","rays"]},
+  27:{mat:"lava",tip:"horn",grip:"scale",bands:3,fx:["ember"]},
+  32:{mat:"leaf",tip:"lily",grip:"rope",bands:1,fx:["firefly","leaf"]},
+  33:{mat:"scale",tip:"serpent",grip:"scale",bands:2,fx:["sparkle","leaf"]},
+  34:{mat:"ice",tip:"snow",grip:"leather",bands:2,fx:["snow"]},
+  35:{mat:"ice",tip:"snow",grip:"leather",bands:3,fx:["snow","sparkle"]},
+  36:{mat:"dark",tip:"rift",grip:"leather",bands:2,fx:["void"]},
+  37:{mat:"dark",tip:"hole",grip:"leather",bands:3,fx:["void"]},
+  38:{mat:"stone",tip:"rune",grip:"rope",bands:2,fx:["dust"]}
+};
+// เบ็ดที่มีงานวาดเฉพาะอยู่แล้ว (ตรีศูล เขี้ยว ฯลฯ) ให้เพิ่มแค่เอฟเฟกต์รอบๆ
+const ROD_FX_ONLY = {
+  28:["ember"], 29:["sparkle"], 30:["sparkle","bubble"], 31:["rays","sparkle"], 39:["sparkle"],
+  40:["bubble","sparkle"], 41:["ember"], 42:["rays","ember"], 43:["feather","sparkle"],
+  44:["ghost"], 45:["void"], 46:["ember"], 47:["snow"], 48:["sparkle","void"]
+};
+
+function _rgrad(g, cx, cy, r, c0, c1){
+  const q = g.createRadialGradient(cx - r*0.3, cy - r*0.3, r*0.1, cx, cy, r);
+  q.addColorStop(0, c0); q.addColorStop(1, c1); return q;
+}
+function _flame(g, x, y, s, t, seed){
+  const fl = Math.sin(t*12 + seed)*0.8*s;
+  g.fillStyle = "#ff6d00";
+  g.beginPath(); g.moveTo(x-2.4*s, y+1); g.quadraticCurveTo(x-3.2*s, y-4*s, x, y-8*s+fl); g.quadraticCurveTo(x+3.2*s, y-4*s, x+2.4*s, y+1); g.closePath(); g.fill();
+  g.fillStyle = "#ffd54f";
+  g.beginPath(); g.moveTo(x-1.4*s, y+1); g.quadraticCurveTo(x-1.8*s, y-2.5*s, x, y-5*s+fl*0.6); g.quadraticCurveTo(x+1.8*s, y-2.5*s, x+1.4*s, y+1); g.closePath(); g.fill();
+}
+function _starPath(g, x, y, R, r){
+  g.beginPath();
+  for(let i = 0; i < 10; i++){
+    const a = -Math.PI/2 + i*Math.PI/5, rr = (i % 2) ? r : R;
+    const px = x + Math.cos(a)*rr, py = y + Math.sin(a)*rr;
+    if(i === 0) g.moveTo(px, py); else g.lineTo(px, py);
+  }
+  g.closePath();
+}
+
+// ---- ปลายคัน ----
+function _tip(g, k, x, y, c, t){
+  g.save();
+  const pulse = 0.65 + 0.35*Math.sin(t*3);
+  switch(k){
+  case "knot":
+    g.fillStyle = _rgrad(g, x, y, 3, c.hi, c.lo); g.beginPath(); g.arc(x, y, 2.7, 0, 6.283); g.fill();
+    g.strokeStyle = _rgba("#3e2723", 0.5); g.lineWidth = 0.6; g.beginPath(); g.arc(x, y, 1.3, 0.3, 4.2); g.stroke(); break;
+  case "ring":
+    g.strokeStyle = c.lo; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 2.6, 0, 6.283); g.stroke();
+    g.strokeStyle = c.hi; g.lineWidth = 1; g.beginPath(); g.arc(x, y, 2.6, 4.0, 5.6); g.stroke(); break;
+  case "orb":
+    _glowDot(g, x, y-1, 8, c.glow, 0.45*pulse);
+    g.fillStyle = _rgrad(g, x, y-1, 3.8, "#ffffff", c.acc); g.beginPath(); g.arc(x, y-1, 3.5, 0, 6.283); g.fill(); break;
+  case "crown":
+    g.fillStyle = c.acc; g.beginPath(); g.moveTo(x-4, y+1.5); g.lineTo(x-4.4, y-4); g.lineTo(x-2, y-1.6); g.lineTo(x, y-5.8); g.lineTo(x+2, y-1.6); g.lineTo(x+4.4, y-4); g.lineTo(x+4, y+1.5); g.closePath(); g.fill();
+    g.strokeStyle = c.lo; g.lineWidth = 0.6; g.stroke();
+    g.fillStyle = "#ff5252"; g.beginPath(); g.arc(x, y-0.2, 1.1, 0, 6.283); g.fill();
+    g.fillStyle = "#fff"; [[-4.4,-4],[0,-5.8],[4.4,-4]].forEach(function(p){ g.beginPath(); g.arc(x+p[0], y+p[1], 0.8, 0, 6.283); g.fill(); }); break;
+  case "diamond":
+    _glowDot(g, x, y-2, 9, c.glow, 0.5*pulse);
+    g.fillStyle = _rgrad(g, x, y-2, 5, c.hi, c.acc);
+    g.beginPath(); g.moveTo(x, y-7); g.lineTo(x+3.8, y-2.6); g.lineTo(x, y+3.2); g.lineTo(x-3.8, y-2.6); g.closePath(); g.fill();
+    g.strokeStyle = "rgba(255,255,255,0.8)"; g.lineWidth = 0.6;
+    g.beginPath(); g.moveTo(x-3.8, y-2.6); g.lineTo(x+3.8, y-2.6); g.moveTo(x, y-7); g.lineTo(x-1.5, y-2.6); g.lineTo(x, y+3.2); g.moveTo(x, y-7); g.lineTo(x+1.5, y-2.6); g.lineTo(x, y+3.2); g.stroke(); break;
+  case "crystal":
+    _glowDot(g, x, y-3, 10, c.glow, 0.45*pulse);
+    [[-3.6,-3.4,0.9],[3.6,-3.4,0.9],[0,-8.4,1]].forEach(function(s, i){
+      const w = i === 2 ? 1.8 : 1.5;
+      g.fillStyle = i === 2 ? c.hi : c.acc;
+      g.beginPath(); g.moveTo(x+s[0]-w, y+1); g.lineTo(x+s[0], y+s[1]-1.5-(i===2?2:0)); g.lineTo(x+s[0]+w, y+1); g.closePath(); g.fill();
+      g.strokeStyle = "rgba(255,255,255,0.6)"; g.lineWidth = 0.5; g.beginPath(); g.moveTo(x+s[0], y+s[1]-1.5-(i===2?2:0)); g.lineTo(x+s[0]+w, y+1); g.stroke();
+    }); break;
+  case "horn":
+    g.lineCap = "round";
+    [-1, 1].forEach(function(sd){
+      g.strokeStyle = c.lo; g.lineWidth = 2.6; g.beginPath(); g.moveTo(x+sd*1, y+1.5); g.quadraticCurveTo(x+sd*6, y-1, x+sd*5, y-6.5); g.stroke();
+      g.strokeStyle = c.acc; g.lineWidth = 1.7; g.beginPath(); g.moveTo(x+sd*1, y+1.5); g.quadraticCurveTo(x+sd*6, y-1, x+sd*5, y-6.5); g.stroke();
+      g.strokeStyle = c.hi; g.lineWidth = 0.6; g.beginPath(); g.moveTo(x+sd*2, y+0.6); g.quadraticCurveTo(x+sd*5.5, y-1.3, x+sd*4.7, y-5); g.stroke();
+    });
+    _glowDot(g, x, y, 6, c.glow, 0.4*pulse); break;
+  case "star":
+    _glowDot(g, x, y-2, 10, c.glow, 0.55*pulse);
+    g.fillStyle = _rgrad(g, x, y-2, 6, "#ffffff", c.acc); _starPath(g, x, y-2, 5.2 + pulse*0.8, 2.3); g.fill();
+    g.strokeStyle = c.lo; g.lineWidth = 0.4; g.stroke(); break;
+  case "halo":
+    g.strokeStyle = _rgba(c.glow, 0.9); g.lineWidth = 1.4; g.beginPath(); g.ellipse(x, y-6.5, 5, 1.7, 0, 0, 6.283); g.stroke();
+    _glowDot(g, x, y-6, 9, c.glow, 0.4*pulse);
+    g.fillStyle = "rgba(255,255,255,0.9)";
+    [-1, 1].forEach(function(sd){ for(let i = 0; i < 3; i++){ g.beginPath(); g.ellipse(x+sd*(3.5+i*1.6), y-0.5-i*1.3, 3, 1, sd*(-0.5-i*0.2), 0, 6.283); g.fill(); } });
+    g.fillStyle = c.acc; g.beginPath(); g.arc(x, y, 1.8, 0, 6.283); g.fill(); break;
+  case "shell":
+    for(let i = -2; i <= 2; i++){
+      g.fillStyle = (i % 2) ? "#ffe0b2" : "#ffab91";
+      g.beginPath(); g.ellipse(x+i*1.3, y-2.6+Math.abs(i)*0.5, 1.4, 4, i*0.28, 0, 6.283); g.fill();
+    }
+    g.fillStyle = c.lo; g.beginPath(); g.arc(x, y+1.3, 1.3, 0, 6.283); g.fill(); break;
+  case "leaf":
+    [-1, 1].forEach(function(sd){
+      g.fillStyle = _rgrad(g, x+sd*2.5, y-3, 4.5, "#c5e1a5", "#2e7d32");
+      g.beginPath(); g.ellipse(x+sd*2.6, y-3.2, 1.9, 4.6, sd*0.65, 0, 6.283); g.fill();
+      g.strokeStyle = "rgba(0,60,0,0.5)"; g.lineWidth = 0.4; g.beginPath(); g.moveTo(x+sd*1.2, y); g.lineTo(x+sd*4, y-6.4); g.stroke();
+    }); break;
+  case "lure":
+    g.strokeStyle = c.lo; g.lineWidth = 1; g.lineCap = "round";
+    g.beginPath(); g.moveTo(x, y+1); g.quadraticCurveTo(x-1, y-9, x+4.5, y-8); g.stroke();
+    _glowDot(g, x+4.5, y-8, 11, c.glow, 0.7*pulse);
+    g.fillStyle = "#fff"; g.beginPath(); g.arc(x+4.5, y-8, 1.8, 0, 6.283); g.fill(); break;
+  case "anchor":
+    g.strokeStyle = c.hi; g.lineWidth = 1.2; g.lineCap = "round";
+    g.beginPath(); g.moveTo(x, y-4); g.lineTo(x, y+2.5); g.moveTo(x-2.2, y-1.4); g.lineTo(x+2.2, y-1.4); g.stroke();
+    g.beginPath(); g.arc(x, y-5, 1.2, 0, 6.283); g.stroke();
+    g.beginPath(); g.arc(x, y, 3.2, 0.15*Math.PI, 0.85*Math.PI); g.stroke(); break;
+  case "wave":
+    g.strokeStyle = c.hi; g.lineWidth = 1.7; g.lineCap = "round";
+    g.beginPath(); g.arc(x, y-1.4, 3.6, Math.PI*0.95, Math.PI*2.15); g.stroke();
+    g.fillStyle = "#fff"; g.beginPath(); g.arc(x+3.4, y-1, 0.9, 0, 6.283); g.fill();
+    g.fillStyle = _rgrad(g, x, y-1.2, 2, "#fff", "#cfd8dc"); g.beginPath(); g.arc(x, y-1.2, 1.6, 0, 6.283); g.fill(); break;
+  case "sun":
+    g.save(); g.translate(x, y-2.4); g.rotate(t*0.5);
+    g.strokeStyle = c.acc; g.lineWidth = 1; for(let i = 0; i < 8; i++){ g.rotate(Math.PI/4); g.beginPath(); g.moveTo(0, -3.6); g.lineTo(0, -6); g.stroke(); }
+    g.restore();
+    _glowDot(g, x, y-2.4, 8, c.glow, 0.5*pulse);
+    g.fillStyle = _rgrad(g, x, y-2.4, 3.2, "#fff59d", "#ff9800"); g.beginPath(); g.arc(x, y-2.4, 2.9, 0, 6.283); g.fill(); break;
+  case "coral":
+    g.lineCap = "round"; g.strokeStyle = c.acc; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(x, y+1); g.lineTo(x-3, y-5); g.moveTo(x, y+1); g.lineTo(x, y-8); g.moveTo(x, y+1); g.lineTo(x+3.2, y-4.4);
+    g.moveTo(x, y-4.5); g.lineTo(x-2, y-7); g.stroke();
+    g.fillStyle = c.hi; [[-3,-5],[0,-8],[3.2,-4.4],[-2,-7]].forEach(function(p){ g.beginPath(); g.arc(x+p[0], y+p[1], 1, 0, 6.283); g.fill(); }); break;
+  case "bolt":
+    _glowDot(g, x, y-2, 9, c.glow, (0.4 + 0.3*Math.sin(t*25)));
+    g.fillStyle = "#fff59d"; g.beginPath(); g.moveTo(x+1.4, y-8); g.lineTo(x-2.6, y-1.2); g.lineTo(x-0.2, y-1.2); g.lineTo(x-1.8, y+4); g.lineTo(x+3.2, y-3); g.lineTo(x+0.6, y-3); g.closePath(); g.fill();
+    g.strokeStyle = "#ff8f00"; g.lineWidth = 0.4; g.stroke(); break;
+  case "crescent":
+    _glowDot(g, x, y-2, 8, c.glow, 0.4*pulse);
+    g.fillStyle = _rgrad(g, x, y-2, 5, c.hi, c.acc);
+    g.beginPath(); g.arc(x, y-2, 3.8, Math.PI*0.5, Math.PI*1.5, false); g.quadraticCurveTo(x+3, y-2, x, y+1.8); g.closePath(); g.fill(); break;
+  case "moonring":
+    g.fillStyle = _rgrad(g, x, y-2, 4, c.acc, c.lo); g.beginPath(); g.arc(x, y-2, 3.2, 0, 6.283); g.fill();
+    g.strokeStyle = _rgba(c.glow, 0.85); g.lineWidth = 1; g.beginPath(); g.ellipse(x, y-2, 6.2, 1.8, -0.35, 0, 6.283); g.stroke();
+    _glowDot(g, x, y-2, 8, c.glow, 0.3*pulse); break;
+  case "eye":
+    _glowDot(g, x, y-1.5, 9, c.glow, 0.5*pulse);
+    g.fillStyle = _rgrad(g, x, y-1.5, 4, c.hi, c.acc); g.beginPath(); g.arc(x, y-1.5, 3.7, 0, 6.283); g.fill();
+    const open = (Math.floor(t*0.8) % 5 === 0 && (t*0.8 % 1) < 0.15) ? 0.3 : 2.4;
+    g.fillStyle = "#000"; g.beginPath(); g.ellipse(x, y-1.5, 0.9, open, 0, 0, 6.283); g.fill(); break;
+  case "flame":
+    _glowDot(g, x, y-3, 9, "#ff9100", 0.45); _flame(g, x, y, 1.05, t, 0); break;
+  case "fireHorns":
+    _glowDot(g, x, y-3, 11, "#ff6d00", 0.4);
+    g.save(); g.translate(x-3, y); g.rotate(-0.3); _flame(g, 0, 0, 0.9, t, 1); g.restore();
+    g.save(); g.translate(x+3, y); g.rotate(0.3); _flame(g, 0, 0, 0.9, t, 2); g.restore();
+    g.fillStyle = c.lo; g.beginPath(); g.arc(x, y+0.5, 2.2, 0, 6.283); g.fill(); break;
+  case "snow":
+    g.save(); g.translate(x, y-2.4); g.rotate(t*0.4);
+    g.strokeStyle = c.hi; g.lineWidth = 1; g.lineCap = "round";
+    for(let i = 0; i < 3; i++){
+      g.rotate(Math.PI/3);
+      g.beginPath(); g.moveTo(0, -5); g.lineTo(0, 5); g.moveTo(-1.5, -3.4); g.lineTo(0, -2.2); g.lineTo(1.5, -3.4); g.moveTo(-1.5, 3.4); g.lineTo(0, 2.2); g.lineTo(1.5, 3.4); g.stroke();
+    }
+    g.restore();
+    _glowDot(g, x, y-2.4, 8, c.glow, 0.35*pulse); break;
+  case "rift":
+    _glowDot(g, x, y-2.5, 10, c.glow, 0.5*pulse);
+    g.fillStyle = "#12002b"; g.beginPath(); g.arc(x, y-2.5, 2.4, 0, 6.283); g.fill();
+    for(let i = 0; i < 3; i++){
+      g.strokeStyle = _rgba(i % 2 ? c.hi : c.glow, 0.85); g.lineWidth = 1;
+      g.beginPath(); g.arc(x, y-2.5, 3+i*1.4, t*(2+i*0.5)+i*2, t*(2+i*0.5)+i*2+Math.PI*1.2); g.stroke();
+    } break;
+  case "hole":
+    _glowDot(g, x, y-2.5, 11, c.glow, 0.35*pulse);
+    g.strokeStyle = _rgba(c.glow, 0.9); g.lineWidth = 1.4; g.beginPath(); g.ellipse(x, y-2.5, 6, 1.9, -0.4, 0, 6.283); g.stroke();
+    g.fillStyle = "#000"; g.beginPath(); g.arc(x, y-2.5, 2.6, 0, 6.283); g.fill();
+    g.strokeStyle = _rgba("#ffffff", 0.7); g.lineWidth = 0.6; g.beginPath(); g.arc(x, y-2.5, 2.9, 3.6, 5.2); g.stroke(); break;
+  case "rune":
+    g.fillStyle = _rgrad(g, x, y-2, 5, c.hi, c.lo);
+    g.beginPath(); g.moveTo(x, y-7); g.lineTo(x+3.4, y-2); g.lineTo(x, y+3); g.lineTo(x-3.4, y-2); g.closePath(); g.fill();
+    g.strokeStyle = _rgba(c.glow, 0.5 + 0.5*pulse); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, y-5); g.lineTo(x, y+1); g.moveTo(x-1.8, y-2.6); g.lineTo(x+1.8, y-2.6); g.stroke();
+    _glowDot(g, x, y-2, 8, c.glow, 0.3*pulse); break;
+  case "lily":
+    g.fillStyle = _rgrad(g, x, y-1, 5, "#a5d6a7", "#2e7d32"); g.beginPath(); g.ellipse(x, y-0.8, 4.8, 2.2, 0, 0, 6.283); g.fill();
+    for(let i = 0; i < 5; i++){ const a = -Math.PI/2 + (i-2)*0.55; g.fillStyle = i % 2 ? "#f8bbd0" : "#f48fb1"; g.beginPath(); g.ellipse(x+Math.cos(a)*2, y-3.4+Math.sin(a)*2, 1.1, 2.1, a+Math.PI/2, 0, 6.283); g.fill(); }
+    g.fillStyle = "#ffeb3b"; g.beginPath(); g.arc(x, y-3.2, 1, 0, 6.283); g.fill(); break;
+  case "serpent":
+    g.lineCap = "round"; g.strokeStyle = c.lo; g.lineWidth = 2.8;
+    g.beginPath(); g.moveTo(x, y+2); g.bezierCurveTo(x-4, y-1, x+4, y-3, x+1, y-6.5); g.stroke();
+    g.strokeStyle = c.acc; g.lineWidth = 1.8; g.beginPath(); g.moveTo(x, y+2); g.bezierCurveTo(x-4, y-1, x+4, y-3, x+1, y-6.5); g.stroke();
+    g.fillStyle = c.hi; g.beginPath(); g.moveTo(x-1.8, y-6.2); g.lineTo(x+4.2, y-7.2); g.lineTo(x+0.2, y-9.6); g.closePath(); g.fill();
+    g.fillStyle = "#ff1744"; g.beginPath(); g.arc(x+0.6, y-7.6, 0.6, 0, 6.283); g.fill();
+    g.fillStyle = "#fff"; g.beginPath(); g.moveTo(x+3.4, y-7.1); g.lineTo(x+3.8, y-5.8); g.lineTo(x+2.8, y-6.9); g.fill(); break;
+  }
+  g.restore();
+}
+function _glowDot(g, x, y, r, col, a){
+  const q = g.createRadialGradient(x, y, 0, x, y, r);
+  q.addColorStop(0, _rgba(col, Math.max(0, Math.min(1, a))));
+  q.addColorStop(1, _rgba(col, 0));
+  g.fillStyle = q; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill();
+}
+
+// ---- ลวดลายวัสดุบนลำคัน (วาดภายใน clip ของตัวคัน) ----
+function _mat(g, mat, hx, c, t){
+  switch(mat){
+  case "wood":
+    g.strokeStyle = "rgba(60,30,10,0.4)"; g.lineWidth = 0.5;
+    for(let i = -1; i <= 1; i++){ g.beginPath(); g.moveTo(hx+i*1.1, 37); g.bezierCurveTo(hx+i*1.1+0.8, 28, hx+i*1.1-0.8, 20, hx+i*0.6, 10); g.stroke(); }
+    g.fillStyle = "rgba(60,30,10,0.45)"; g.beginPath(); g.ellipse(hx-0.4, 24, 0.7, 1.2, 0, 0, 6.283); g.fill();
+    g.beginPath(); g.ellipse(hx+0.5, 15, 0.5, 0.9, 0, 0, 6.283); g.fill(); break;
+  case "iron":
+    g.strokeStyle = "rgba(255,255,255,0.18)"; g.lineWidth = 0.4;
+    for(let y = 12; y < 37; y += 2.2){ g.beginPath(); g.moveTo(hx-3, y); g.lineTo(hx+3, y); g.stroke(); }
+    g.fillStyle = "rgba(255,255,255,0.6)"; [14, 20, 26].forEach(function(y){ g.beginPath(); g.arc(hx, y, 0.45, 0, 6.283); g.fill(); }); break;
+  case "silver": case "gold": {
+    const p = ((t*0.55) % 1.6);
+    g.fillStyle = "rgba(255,255,255,0.55)";
+    g.save(); g.translate(hx, 10 + p*20); g.rotate(-0.5); g.fillRect(-4, -0.9, 8, 1.8); g.restore();
+    g.strokeStyle = "rgba(0,0,0,0.18)"; g.lineWidth = 0.5; g.beginPath(); g.moveTo(hx-1, 36); g.lineTo(hx-0.6, 11); g.stroke(); break; }
+  case "gem": case "crystal": case "ice": {
+    g.strokeStyle = "rgba(255,255,255,0.45)"; g.lineWidth = 0.5;
+    for(let y = 14; y < 37; y += 4.6){ g.beginPath(); g.moveTo(hx-3, y+1.6); g.lineTo(hx, y-1.2); g.lineTo(hx+3, y+1.6); g.stroke(); }
+    g.fillStyle = "rgba(255,255,255,0.28)"; g.beginPath(); g.moveTo(hx+0.4, 11); g.lineTo(hx+2.2, 36); g.lineTo(hx+0.4, 36); g.closePath(); g.fill();
+    const p = ((t*0.7) % 1.5);
+    g.fillStyle = "rgba(255,255,255,0.5)"; g.save(); g.translate(hx, 10 + p*20); g.rotate(-0.5); g.fillRect(-4, -0.7, 8, 1.4); g.restore(); break; }
+  case "scale":
+    g.strokeStyle = "rgba(0,0,0,0.3)"; g.lineWidth = 0.5;
+    for(let r = 0; r < 7; r++) for(let k = -1; k <= 1; k++){ g.beginPath(); g.arc(hx+k*2.2+(r%2?1.1:0), 14+r*3.4, 1.2, 0, Math.PI); g.stroke(); }
+    g.strokeStyle = "rgba(255,255,255,0.18)"; for(let r = 0; r < 7; r++){ g.beginPath(); g.arc(hx+1.1+(r%2?1.1:0), 13+r*3.4, 1.2, Math.PI, 0); g.stroke(); } break;
+  case "stone":
+    g.strokeStyle = "rgba(0,0,0,0.4)"; g.lineWidth = 0.5;
+    g.beginPath(); g.moveTo(hx-2, 33); g.lineTo(hx, 29); g.lineTo(hx-1.4, 24); g.lineTo(hx+1, 19); g.stroke();
+    g.strokeStyle = _rgba(c.glow, 0.5 + 0.5*Math.sin(t*2)); g.lineWidth = 0.7;
+    g.beginPath(); g.moveTo(hx-1.2, 28); g.lineTo(hx+1.2, 28); g.moveTo(hx, 26.6); g.lineTo(hx, 29.4); g.moveTo(hx-1.2, 18); g.lineTo(hx+1.2, 20); g.stroke(); break;
+  case "rune":
+    g.strokeStyle = _rgba(c.glow, 0.45 + 0.4*Math.sin(t*2)); g.lineWidth = 0.6;
+    for(let i = 0; i < 4; i++){ const y = 15 + i*5.5; g.beginPath(); g.moveTo(hx-1.2, y); g.lineTo(hx+1.2, y+1.4); g.lineTo(hx-0.6, y+2.8); g.stroke(); } break;
+  case "lava": {
+    const a = 0.55 + 0.45*Math.sin(t*3);
+    g.strokeStyle = "rgba(255,196,60," + a + ")"; g.lineWidth = 0.8;
+    g.beginPath(); g.moveTo(hx-1.8, 36); g.lineTo(hx+0.4, 30); g.lineTo(hx-1, 25); g.lineTo(hx+1.2, 19); g.lineTo(hx, 12); g.stroke();
+    g.strokeStyle = "rgba(0,0,0,0.5)"; g.lineWidth = 0.4; g.beginPath(); g.moveTo(hx+1.6, 33); g.lineTo(hx+0.6, 27); g.lineTo(hx+1.8, 22); g.stroke(); break; }
+  case "leaf":
+    g.strokeStyle = "rgba(220,255,200,0.55)"; g.lineWidth = 0.5;
+    g.beginPath(); g.moveTo(hx, 37); g.lineTo(hx, 11); g.stroke();
+    for(let y = 14; y < 36; y += 4){ g.beginPath(); g.moveTo(hx, y+3); g.lineTo(hx-2.4, y); g.moveTo(hx, y+3); g.lineTo(hx+2.4, y); g.stroke(); } break;
+  case "dark": {
+    g.strokeStyle = _rgba(c.glow, 0.28); g.lineWidth = 0.9;
+    for(let i = 0; i < 3; i++){ g.beginPath(); for(let y = 11; y <= 37; y += 2){ const x = hx + Math.sin(y*0.5 + t*2 + i*2)*1.6; if(y === 11) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke(); } break; }
+  case "sea": case "coral":
+    g.fillStyle = "rgba(255,255,255,0.35)";
+    [[-1.2,33],[1,28],[-0.6,22],[1.2,16],[-1,13]].forEach(function(p){ g.beginPath(); g.arc(hx+p[0], p[1], 0.7, 0, 6.283); g.fill(); });
+    g.strokeStyle = "rgba(255,255,255,0.22)"; g.lineWidth = 0.5; g.beginPath(); g.moveTo(hx-2.5, 30); g.quadraticCurveTo(hx, 27, hx+2.5, 30); g.moveTo(hx-2.2, 19); g.quadraticCurveTo(hx, 16, hx+2.2, 19); g.stroke(); break;
+  default:
+    g.strokeStyle = "rgba(255,255,255,0.2)"; g.lineWidth = 0.5; g.beginPath(); g.moveTo(hx+1, 36); g.lineTo(hx+0.5, 11); g.stroke();
+  }
+}
+
+function drawRodFancy(g, hx, id, rc){
+  const S = ROD_STYLE[id] || {mat:"metal", tip:"ring", grip:"leather", bands:1};
+  const t = Date.now()/1000;
+  const base = rc.rod || "#888";
+  const c = { base: base, hi: _lite(base, 0.55), lo: _dark(base, 0.5), acc: rc.hook || base, glow: rc.glow || _lite(base, 0.5) };
+  const yB = 37, yT = 10;
+  g.save(); g.lineCap = "round"; g.lineJoin = "round"; g.globalAlpha = 1;
+
+  // ออร่าตามระดับของเบ็ด
+  const lk = (typeof rods !== "undefined" && rods[id]) ? rods[id].luck : 0;
+  if(rc.glow && lk >= 12){
+    const r = 7 + Math.min(lk, 120)/10, a = Math.min(0.12 + lk/320, 0.42) * (0.8 + 0.2*Math.sin(t*2.2));
+    _glowDot(g, hx, 17, r + 12, c.glow, a*0.55);
+    _glowDot(g, hx, 10, r, c.glow, a);
+  }
+
+  // ลำคัน (เรียวเล็กลงไปทางปลาย)
+  const body = function(){ g.beginPath(); g.moveTo(hx-2.8, yB); g.lineTo(hx-1.1, yT+1); g.lineTo(hx+1.1, yT+1); g.lineTo(hx+2.8, yB); g.closePath(); };
+  body();
+  const bg = g.createLinearGradient(hx-2.8, 0, hx+2.8, 0);
+  bg.addColorStop(0, c.lo); bg.addColorStop(0.42, base); bg.addColorStop(1, c.hi);
+  g.fillStyle = bg; g.fill();
+  g.save(); body(); g.clip(); _mat(g, S.mat, hx, c, t); g.restore();
+  g.strokeStyle = "rgba(0,0,0,0.35)"; g.lineWidth = 0.5; body(); g.stroke();
+  g.strokeStyle = "rgba(255,255,255,0.5)"; g.lineWidth = 0.6; g.beginPath(); g.moveTo(hx+2.1, yB-1); g.lineTo(hx+0.9, yT+2); g.stroke();
+
+  // ข้อต่อ/แหวนโลหะ
+  const bandY = [31, 23, 16];
+  for(let i = 0; i < (S.bands || 0); i++){
+    const y = bandY[i], w = 3.2 - i*0.5;
+    const q = g.createLinearGradient(hx-w, 0, hx+w, 0);
+    q.addColorStop(0, _dark(c.acc, 0.4)); q.addColorStop(0.5, c.acc); q.addColorStop(1, _lite(c.acc, 0.6));
+    g.fillStyle = q; g.fillRect(hx-w, y-1.1, w*2, 2.2);
+    g.strokeStyle = "rgba(0,0,0,0.35)"; g.lineWidth = 0.4; g.strokeRect(hx-w, y-1.1, w*2, 2.2);
+  }
+
+  // ด้ามจับ
+  const gy0 = 29.5, gh = yB - gy0 + 1;
+  const gc = S.grip === "rope" ? ["#d7b98a", "#8d6e3f"] : S.grip === "gold" ? ["#ffe082", "#a67c00"] : S.grip === "scale" ? [_lite(c.acc, 0.2), _dark(c.acc, 0.5)] : ["#6d4c41", "#2b1a14"];
+  const gg = g.createLinearGradient(hx-3.4, 0, hx+3.4, 0);
+  gg.addColorStop(0, gc[1]); gg.addColorStop(0.6, gc[0]); gg.addColorStop(1, _lite(gc[0], 0.3));
+  g.fillStyle = gg; g.fillRect(hx-3.3, gy0, 6.6, gh);
+  g.strokeStyle = "rgba(0,0,0,0.38)"; g.lineWidth = 0.55;
+  for(let y = gy0; y < yB+1; y += 1.9){ g.beginPath(); g.moveTo(hx-3.3, y+1.4); g.lineTo(hx+3.3, y-0.2); g.stroke(); }
+  g.strokeStyle = "rgba(0,0,0,0.5)"; g.lineWidth = 0.5; g.strokeRect(hx-3.3, gy0, 6.6, gh);
+  g.fillStyle = _rgrad(g, hx, yB+1.5, 3, _lite(c.acc, 0.5), _dark(c.acc, 0.35));
+  g.beginPath(); g.arc(hx, yB+1.6, 2.9, 0, 6.283); g.fill();
+  g.strokeStyle = "rgba(0,0,0,0.4)"; g.lineWidth = 0.4; g.stroke();
+
+  // รอก
+  const rx = hx + 6.6, ry = 31.5, ang = (typeof fishingState !== "undefined" && fishingState === "biting") ? t*14 : t*0.4;
+  g.fillStyle = _dark(c.acc, 0.35); g.fillRect(hx+2.4, ry-1.2, 3, 2.4);
+  g.fillStyle = _rgrad(g, rx, ry, 4.6, _lite(c.acc, 0.6), _dark(c.acc, 0.3));
+  g.beginPath(); g.arc(rx, ry, 4.1, 0, 6.283); g.fill();
+  g.strokeStyle = "rgba(0,0,0,0.55)"; g.lineWidth = 0.9; g.stroke();
+  g.strokeStyle = "rgba(0,0,0,0.45)"; g.lineWidth = 0.5;
+  for(let i = 0; i < 4; i++){ const a = ang + i*Math.PI/2; g.beginPath(); g.moveTo(rx+Math.cos(a)*0.8, ry+Math.sin(a)*0.8); g.lineTo(rx+Math.cos(a)*3.5, ry+Math.sin(a)*3.5); g.stroke(); }
+  g.fillStyle = c.hi; g.beginPath(); g.arc(rx, ry, 1, 0, 6.283); g.fill();
+  const hxk = rx + Math.cos(ang)*5.4, hyk = ry + Math.sin(ang)*5.4;
+  g.strokeStyle = "rgba(40,40,40,0.9)"; g.lineWidth = 0.8; g.beginPath(); g.moveTo(rx, ry); g.lineTo(hxk, hyk); g.stroke();
+  g.fillStyle = c.hi; g.beginPath(); g.arc(hxk, hyk, 1, 0, 6.283); g.fill();
+
+  // ไกด์สายและเส้นสายที่ร้อยขึ้นปลายคัน
+  g.strokeStyle = _rgba(rc.line || "#fff", 0.55); g.lineWidth = 0.6;
+  g.beginPath(); g.moveTo(rx-3.6, ry-1.4); g.lineTo(hx+3.2, 26.5); g.lineTo(hx+2.9, 20); g.lineTo(hx+2.2, 15); g.lineTo(hx, yT); g.stroke();
+  [[26.5, 3.2], [20, 2.9], [15, 2.2]].forEach(function(p){
+    g.strokeStyle = c.hi; g.lineWidth = 0.9; g.beginPath(); g.arc(hx+p[1], p[0], 1.3, 0, 6.283); g.stroke();
+  });
+
+  // ปลายคัน
+  _tip(g, S.tip, hx, yT, c, t);
+  g.restore();
+}
+
+// ---- เอฟเฟกต์ลอยรอบคัน ----
+function _fx(g, name, hx, col, t){
+  g.save();
+  const n = 6;
+  switch(name){
+  case "sparkle":
+    g.globalCompositeOperation = "lighter";
+    for(let i = 0; i < n; i++){
+      const a = t*0.9 + i*1.05, r = 7 + ((i*37) % 7);
+      const x = hx + Math.cos(a)*r*1.2, y = 20 + Math.sin(a*1.3)*13 - ((i*5) % 6);
+      const tw = Math.abs(Math.sin(t*3 + i*1.7)), s = 1 + tw*2.4;
+      g.globalAlpha = tw; g.strokeStyle = col; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x-s, y); g.lineTo(x+s, y); g.moveTo(x, y-s); g.lineTo(x, y+s); g.stroke();
+    } break;
+  case "ember":
+    g.globalCompositeOperation = "lighter";
+    for(let i = 0; i < n; i++){
+      const p = (t*0.5 + i/n) % 1, x = hx + Math.sin(i*5.1 + t*2)*5 + (i % 2 ? 3 : -3)*p, y = 24 - p*22;
+      g.globalAlpha = (1-p)*0.9; g.fillStyle = i % 2 ? "#ffb300" : "#ff5722";
+      g.beginPath(); g.arc(x, y, 0.5 + (1-p)*1.2, 0, 6.283); g.fill();
+    } break;
+  case "bubble":
+    for(let i = 0; i < 5; i++){
+      const p = (t*0.35 + i/5) % 1, x = hx + Math.sin(i*4.3 + t*1.6)*6, y = 36 - p*32, r = 0.9 + (i % 3)*0.6;
+      g.globalAlpha = 0.75*(1-p*0.6); g.strokeStyle = "rgba(220,245,255,0.9)"; g.lineWidth = 0.6;
+      g.beginPath(); g.arc(x, y, r, 0, 6.283); g.stroke();
+      g.fillStyle = "rgba(255,255,255,0.8)"; g.beginPath(); g.arc(x-r*0.3, y-r*0.3, r*0.25, 0, 6.283); g.fill();
+    } break;
+  case "snow":
+    for(let i = 0; i < 7; i++){
+      const p = (t*0.3 + i/7) % 1, x = hx + Math.sin(i*3.7 + t*0.9)*10, y = 2 + p*36;
+      g.globalAlpha = 0.85; g.fillStyle = "#fff"; g.beginPath(); g.arc(x, y, 0.7 + (i % 3)*0.35, 0, 6.283); g.fill();
+    } break;
+  case "bolt":
+    if(Math.floor(t*7) % 4 === 0){
+      let x = hx, y = 9; g.globalCompositeOperation = "lighter";
+      for(let k = 0; k < 2; k++){
+        g.strokeStyle = k ? "#fff" : col; g.lineWidth = k ? 0.7 : 2; g.globalAlpha = k ? 1 : 0.4;
+        g.beginPath(); g.moveTo(x, y);
+        let px = x, py = y;
+        for(let j = 1; j <= 4; j++){ px = x + ((j*53 + Math.floor(t*7)*17) % 11) - 5; py = y + j*3.4; g.lineTo(px, py); }
+        g.stroke();
+      }
+    } break;
+  case "void":
+    for(let i = 0; i < 7; i++){
+      const p = (t*0.4 + i/7) % 1, r = 16*(1-p) + 2, a = t*2 + i*0.9;
+      g.globalAlpha = p*0.85; g.fillStyle = col;
+      g.beginPath(); g.arc(hx + Math.cos(a)*r, 14 + Math.sin(a)*r*0.7, 0.9, 0, 6.283); g.fill();
+    } break;
+  case "firefly":
+    g.globalCompositeOperation = "lighter";
+    for(let i = 0; i < 4; i++){
+      const x = hx + Math.sin(t*0.8 + i*2)*12, y = 22 + Math.cos(t*0.6 + i*3)*10, a = 0.4 + 0.6*Math.abs(Math.sin(t*2 + i));
+      _glowDot(g, x, y, 5, "#c6ff00", a*0.8);
+      g.fillStyle = "rgba(255,255,200," + a + ")"; g.beginPath(); g.arc(x, y, 0.8, 0, 6.283); g.fill();
+    } break;
+  case "leaf":
+    for(let i = 0; i < 3; i++){
+      const p = (t*0.18 + i/3) % 1, x = hx + Math.sin(i*2.5 + t)*9, y = 4 + p*34;
+      g.save(); g.translate(x, y); g.rotate(t*1.5 + i); g.globalAlpha = 0.85;
+      g.fillStyle = i % 2 ? "#7cb342" : "#aed581"; g.beginPath(); g.ellipse(0, 0, 1.8, 0.8, 0, 0, 6.283); g.fill(); g.restore();
+    } break;
+  case "dust":
+    for(let i = 0; i < 6; i++){
+      const p = (t*0.12 + i/6) % 1, x = hx - 14 + p*28, y = 14 + Math.sin(i*2.1 + t*0.7)*10;
+      g.globalAlpha = Math.sin(p*Math.PI)*0.6; g.fillStyle = "#d7b98a"; g.beginPath(); g.arc(x, y, 0.8, 0, 6.283); g.fill();
+    } break;
+  case "rays":
+    g.globalCompositeOperation = "lighter"; g.translate(hx, 10); g.rotate(t*0.4);
+    for(let i = 0; i < 8; i++){
+      g.rotate(Math.PI/4); g.globalAlpha = 0.28 + 0.12*Math.sin(t*2 + i);
+      const q = g.createLinearGradient(0, 0, 0, -16); q.addColorStop(0, col); q.addColorStop(1, _rgba(col, 0));
+      g.fillStyle = q; g.beginPath(); g.moveTo(-1, -2); g.lineTo(1, -2); g.lineTo(0.3, -16); g.lineTo(-0.3, -16); g.closePath(); g.fill();
+    } break;
+  case "feather":
+    for(let i = 0; i < 4; i++){
+      const p = (t*0.2 + i/4) % 1, x = hx + Math.sin(i*3.1 + t*1.1)*9, y = 3 + p*34;
+      g.save(); g.translate(x, y); g.rotate(Math.sin(t + i)*0.9); g.globalAlpha = 0.8*(1-p*0.5);
+      g.fillStyle = "#fff8e1"; g.beginPath(); g.ellipse(0, 0, 2.6, 0.9, 0, 0, 6.283); g.fill();
+      g.strokeStyle = "rgba(255,193,7,0.7)"; g.lineWidth = 0.4; g.beginPath(); g.moveTo(-2.6, 0); g.lineTo(2.6, 0); g.stroke(); g.restore();
+    } break;
+  case "ghost":
+    for(let i = 0; i < 3; i++){
+      const p = (t*0.3 + i/3) % 1, x0 = hx + (i-1)*7, y0 = 36 - p*30;
+      g.globalAlpha = Math.sin(p*Math.PI)*0.5; g.strokeStyle = col; g.lineWidth = 1.6; g.lineCap = "round";
+      g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(x0 + Math.sin(t*2 + i)*4, y0 - 5, x0 + Math.sin(t*2 + i + 1)*3, y0 - 10); g.stroke();
+    } break;
+  }
+  g.restore();
+}
+function drawRodFX(g, hx, id, rc){
+  const S = ROD_STYLE[id];
+  const list = S ? (S.fx || []) : (ROD_FX_ONLY[id] || []);
+  if(!list.length) return;
+  const t = Date.now()/1000, col = rc.glow || rc.rod || "#fff";
+  for(let i = 0; i < list.length; i++){
+    let c2 = col;
+    if(list[i] === "void" && !S) c2 = rc.line || col;
+    _fx(g, list[i], hx, c2, t);
+  }
+}
+
 function draw(){
   const loc=locations[currentLoc];
   const grad=ctx.createLinearGradient(0,0,0,canvas.height);
@@ -3023,7 +3495,7 @@ function draw(){
   }
 
   // เรืองแสงรอบเบ็ด (เบ็ดระดับสูง)
-  if(rc.glow){
+  if(rc.glow && !ROD_STYLE[currentRod]){
     ctx.strokeStyle = rc.glow;
     ctx.lineWidth = 8;
     ctx.globalAlpha = 0.25;
@@ -3537,7 +4009,7 @@ function draw(){
   const rodId = currentRod;
 
   // เรืองแสงพื้นฐาน
-  if(rc.glow && rodId!==28 && rodId!==29 && rodId!==30 && rodId!==31 && rodId!==40 && rodId!==41 && rodId!==42 && rodId!==43 && rodId!==44 && rodId!==45 && rodId!==46 && rodId!==47 && rodId!==48 && rodId!==39){
+  if(rc.glow && !ROD_STYLE[rodId] && rodId!==28 && rodId!==29 && rodId!==30 && rodId!==31 && rodId!==40 && rodId!==41 && rodId!==42 && rodId!==43 && rodId!==44 && rodId!==45 && rodId!==46 && rodId!==47 && rodId!==48 && rodId!==39){
     ctx.strokeStyle = rc.glow;
     ctx.lineWidth = 9;
     ctx.globalAlpha = 0.2;
@@ -4213,39 +4685,9 @@ function draw(){
     ctx.fillStyle="#fff";
     ctx.beginPath(); ctx.arc(hx, hy, 3, 0, Math.PI*2); ctx.fill();
   } else {
-    // เบ็ดทั่วไป: ด้าม+ที่จับ+รอก+ปลาย
-    // ด้ามหลัก
-    ctx.strokeStyle = rc.rod;
-    ctx.lineWidth = 5;
-    ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(hx,36); ctx.lineTo(hx,10); ctx.stroke();
-    // ที่จับล่าง
-    ctx.strokeStyle = rc.hook || rc.rod;
-    ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.moveTo(hx,36); ctx.lineTo(hx,30); ctx.stroke();
-    // แถบลาย
-    ctx.strokeStyle = rc.line || "#fff";
-    ctx.lineWidth = 1.5;
-    ctx.globalAlpha = 0.7;
-    for(let y of [28,24,20,16]){
-      ctx.beginPath(); ctx.moveTo(hx-3,y); ctx.lineTo(hx+3,y); ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-    // รอกเล็ก
-    ctx.fillStyle = rc.hook || rc.rod;
-    ctx.beginPath(); ctx.arc(hx+5, 26, 4, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = "#fff"; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.arc(hx+5, 26, 2, 0, Math.PI*2); ctx.stroke();
-    // ปลายคัน
-    ctx.fillStyle = rc.hook || rc.rod;
-    ctx.beginPath(); ctx.arc(hx, 10, 3.5, 0, Math.PI*2); ctx.fill();
-    if(rc.glow){
-      ctx.fillStyle = rc.glow;
-      ctx.globalAlpha = 0.4;
-      ctx.beginPath(); ctx.arc(hx, 10, 7, 0, Math.PI*2); ctx.fill();
-      ctx.globalAlpha = 1;
-    }
+    drawRodFancy(ctx, hx, rodId, rc);
   }
+  drawRodFX(ctx, hx, rodId, rc);
 
   // สายเบ็ด
   ctx.strokeStyle = rc.line || "#90caf9";
