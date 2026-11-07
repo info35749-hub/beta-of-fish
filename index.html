@@ -2939,6 +2939,345 @@ function drawRodFX(g, hx, id, rc){
   }
 }
 
+// ===== เอฟเฟกต์สกิลเบ็ดแบบใหม่ (พาร์ติเคิลบนแคนวาส) =====
+var PFX = {list: [], last: 0, run: false};
+var PFX_COL = {28:"255,80,20",29:"79,195,247",30:"255,215,90",31:"255,109,0",39:"255,100,200",40:"64,196,255",41:"255,40,70",42:"255,170,40",43:"255,230,150",44:"120,190,255",45:"186,104,255",46:"255,50,70",47:"170,235,255",48:"255,215,0"};
+var _ZEN_COLS = ["141,110,99","255,215,0","255,109,0","255,224,130","21,101,192","198,40,40","64,196,255","255,23,68","0,229,255","198,40,40"];
+var _zenI = 0;
+function _pr(a, b){ return a + Math.random()*(b - a); }
+function _pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+function pfxAdd(p){
+  if(PFX.list.length > 420) PFX.list.shift();
+  p.age = -(p.delay || 0);
+  if(p.life == null) p.life = 0.5;
+  PFX.list.push(p);
+  pfxKick();
+}
+function pfxKick(){
+  if(PFX.run) return;
+  PFX.run = true; PFX.last = performance.now();
+  var step = function(){
+    if(!PFX.list.length || typeof currentUser === "undefined" || !currentUser){ PFX.run = false; return; }
+    try{ draw(); }catch(e){}
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function pfxSpark(x, y, ang, spd, col, o){
+  pfxAdd(Object.assign({t:"spark", x:x, y:y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd, g:0, life:_pr(0.4, 0.9), size:_pr(1.2, 2.6), col:col, drag:1.6}, o || {}));
+}
+function pfxBurst(x, y, n, col, spd, o){
+  for(var i = 0; i < n; i++) pfxSpark(x, y, _pr(0, 6.283), _pr(spd*0.35, spd), col, o);
+}
+function pfxRing(x, y, col, o){ pfxAdd(Object.assign({t:"ring", x:x, y:y, r0:4, grow:90, life:0.5, w:3, col:col, squash:1}, o || {})); }
+function pfxFlash(x, y, r, col, life, o){ pfxAdd(Object.assign({t:"glow", x:x, y:y, r:r, col:col, life:life || 0.4}, o || {})); }
+function pfxSlash(x, y, ang, len, col, o){ pfxAdd(Object.assign({t:"slash", x:x, y:y, ang:ang, len:len, w:14, curve:0.3, col:col, life:0.4}, o || {})); }
+function pfxBeam(x, y0, y1, w, col, life, o){ pfxAdd(Object.assign({t:"beam", x:x, y0:y0, y1:y1, w:w, col:col, life:life || 0.4}, o || {})); }
+function pfxStar(x, y, s, col, life, o){ pfxAdd(Object.assign({t:"star", x:x, y:y, size:s, col:col, life:life || 0.5}, o || {})); }
+function pfxBolt(x0, y0, x1, y1, col, life, o){
+  var pts = [], n = 9, dx = x1 - x0, dy = y1 - y0, L = Math.sqrt(dx*dx + dy*dy) || 1, nx = -dy/L, ny = dx/L;
+  for(var i = 0; i <= n; i++){
+    var j = (i === 0 || i === n) ? 0 : _pr(-9, 9);
+    pts.push([x0 + dx*i/n + nx*j, y0 + dy*i/n + ny*j]);
+  }
+  pfxAdd(Object.assign({t:"bolt", pts:pts, col:col, life:life || 0.3}, o || {}));
+}
+function pfxShard(x, y, ang, spd, col, o){
+  pfxAdd(Object.assign({t:"shard", x:x, y:y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd, g:260, rot:_pr(0, 6), vr:_pr(-9, 9), size:_pr(2.5, 5), col:col, life:_pr(0.5, 0.95)}, o || {}));
+}
+
+// ---------- วาดพาร์ติเคิล ----------
+function pfxDraw(){
+  var now = performance.now(), dt = (now - PFX.last)/1000; PFX.last = now;
+  if(dt > 0.05) dt = 0.05; if(dt < 0.0001) dt = 0.0001;
+  var L = PFX.list; if(!L.length) return;
+  ctx.save();
+  for(var i = L.length - 1; i >= 0; i--){
+    var p = L[i]; p.age += dt;
+    if(p.age >= p.life){ L.splice(i, 1); continue; }
+    if(p.age < 0) continue;
+    pfxOne(p, p.age/p.life, 1 - p.age/p.life, dt);
+  }
+  ctx.restore();
+}
+function _pc(col, a){ return "rgba(" + col + "," + Math.max(0, Math.min(1, a)) + ")"; }
+function pfxOne(p, u, fade, dt){
+  var c = ctx, i, k;
+  c.globalCompositeOperation = "lighter"; c.shadowBlur = 0;
+  switch(p.t){
+  case "spark": {
+    p.vx -= p.vx*p.drag*dt; p.vy -= p.vy*p.drag*dt; p.vy += (p.g || 0)*dt; p.x += p.vx*dt; p.y += p.vy*dt;
+    c.strokeStyle = _pc(p.col, fade*0.8); c.lineWidth = p.size*0.9; c.lineCap = "round";
+    c.beginPath(); c.moveTo(p.x - p.vx*0.045, p.y - p.vy*0.045); c.lineTo(p.x, p.y); c.stroke();
+    c.fillStyle = _pc(p.col, fade*0.3); c.beginPath(); c.arc(p.x, p.y, p.size*2.6, 0, 6.283); c.fill();
+    c.fillStyle = _pc("255,255,255", fade); c.beginPath(); c.arc(p.x, p.y, p.size*0.55, 0, 6.283); c.fill();
+    break; }
+  case "ring": {
+    var r = p.r0 + p.grow*p.age; if(r < 1) break;
+    c.strokeStyle = _pc(p.col, fade*0.9); c.lineWidth = Math.max(0.6, p.w*fade);
+    c.beginPath(); c.ellipse(p.x, p.y, r, r*(p.squash || 1), 0, 0, 6.283); c.stroke();
+    c.strokeStyle = _pc(p.col, fade*0.25); c.lineWidth = p.w*2.4*fade;
+    c.beginPath(); c.ellipse(p.x, p.y, r, r*(p.squash || 1), 0, 0, 6.283); c.stroke();
+    break; }
+  case "glow": {
+    var gr = p.r*(0.55 + 0.75*u), g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
+    g.addColorStop(0, _pc("255,255,255", fade*0.8)); g.addColorStop(0.25, _pc(p.col, fade*0.65)); g.addColorStop(1, _pc(p.col, 0));
+    c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, gr, 0, 6.283); c.fill();
+    break; }
+  case "slash": {
+    var dx = Math.cos(p.ang), dy = Math.sin(p.ang), nx = -dy, ny = dx;
+    var head = Math.min(1, p.age/(p.life*0.35)), tail = Math.max(0, (p.age - p.life*0.3)/(p.life*0.7));
+    if(tail >= head) break;
+    var N = 22, Lp = [], Rp = [], Cp = [];
+    for(k = 0; k <= N; k++){
+      var uu = tail + (head - tail)*k/N, s = Math.sin(Math.PI*uu), off = s*p.curve*p.len, wd = s*p.w*0.5*(1 - tail*0.4);
+      var cx = p.x + dx*(uu - 0.5)*p.len + nx*off, cy = p.y + dy*(uu - 0.5)*p.len + ny*off;
+      Lp.push([cx + nx*wd, cy + ny*wd]); Rp.push([cx - nx*wd, cy - ny*wd]); Cp.push([cx, cy, wd]);
+    }
+    c.shadowColor = _pc(p.col, 1); c.shadowBlur = 16;
+    c.fillStyle = _pc(p.col, 0.9*fade + 0.1);
+    c.beginPath(); c.moveTo(Lp[0][0], Lp[0][1]);
+    for(k = 1; k <= N; k++) c.lineTo(Lp[k][0], Lp[k][1]);
+    for(k = N; k >= 0; k--) c.lineTo(Rp[k][0], Rp[k][1]);
+    c.closePath(); c.fill();
+    c.shadowBlur = 0; c.fillStyle = _pc("255,255,255", 0.95*fade);
+    c.beginPath(); c.moveTo(Cp[0][0], Cp[0][1]);
+    for(k = 1; k <= N; k++) c.lineTo(Cp[k][0] - nx*Cp[k][2]*0.35, Cp[k][1] - ny*Cp[k][2]*0.35);
+    for(k = N; k >= 0; k--) c.lineTo(Cp[k][0] + nx*Cp[k][2]*0.35, Cp[k][1] + ny*Cp[k][2]*0.35);
+    c.closePath(); c.fill();
+    break; }
+  case "beam": {
+    var a = u < 0.12 ? u/0.12 : fade, w = p.w*(0.75 + 0.25*Math.sin(p.age*70));
+    var bg = c.createLinearGradient(p.x - w, 0, p.x + w, 0);
+    bg.addColorStop(0, _pc(p.col, 0)); bg.addColorStop(0.3, _pc(p.col, a*0.75)); bg.addColorStop(0.5, _pc("255,255,255", a));
+    bg.addColorStop(0.7, _pc(p.col, a*0.75)); bg.addColorStop(1, _pc(p.col, 0));
+    c.fillStyle = bg; c.fillRect(p.x - w, p.y0, w*2, p.y1 - p.y0);
+    break; }
+  case "bolt": {
+    var P = p.pts;
+    for(k = 0; k < 3; k++){
+      c.strokeStyle = k === 0 ? _pc(p.col, fade*0.25) : k === 1 ? _pc(p.col, fade*0.8) : _pc("255,255,255", fade);
+      c.lineWidth = k === 0 ? 7 : k === 1 ? 3 : 1.2; c.lineJoin = "round";
+      c.beginPath(); c.moveTo(P[0][0], P[0][1]); for(i = 1; i < P.length; i++) c.lineTo(P[i][0], P[i][1]); c.stroke();
+    }
+    break; }
+  case "shard": {
+    p.vy += p.g*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.rot += p.vr*dt;
+    if(p.dark) c.globalCompositeOperation = "source-over";
+    c.fillStyle = _pc(p.col, fade*(p.dark ? 0.9 : 0.85));
+    c.beginPath();
+    for(k = 0; k < 3; k++){ var an = p.rot + k*2.094, rr = k === 0 ? p.size*1.7 : p.size*0.8; c.lineTo(p.x + Math.cos(an)*rr, p.y + Math.sin(an)*rr); }
+    c.closePath(); c.fill();
+    break; }
+  case "orbit": {
+    p.a += p.av*dt; p.rad = Math.max(3, p.rad - p.rv*dt);
+    var ox = p.cx + Math.cos(p.a)*p.rad, oy = p.cy + Math.sin(p.a)*p.rad*0.85;
+    c.strokeStyle = _pc(p.col, fade*0.7); c.lineWidth = p.size*0.8; c.lineCap = "round";
+    c.beginPath(); c.moveTo(p.cx + Math.cos(p.a - 0.35)*(p.rad + 3), p.cy + Math.sin(p.a - 0.35)*(p.rad + 3)*0.85); c.lineTo(ox, oy); c.stroke();
+    c.fillStyle = _pc("255,255,255", fade); c.beginPath(); c.arc(ox, oy, p.size*0.6, 0, 6.283); c.fill();
+    break; }
+  case "hole": {
+    var hr = p.r*(1 - u*0.25), tt = p.age*7;
+    c.globalCompositeOperation = "source-over";
+    var hg = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, hr);
+    hg.addColorStop(0, _pc("0,0,0", 0.95*fade)); hg.addColorStop(0.7, _pc("20,0,0", 0.8*fade)); hg.addColorStop(1, _pc("0,0,0", 0));
+    c.fillStyle = hg; c.beginPath(); c.arc(p.x, p.y, hr, 0, 6.283); c.fill();
+    c.globalCompositeOperation = "lighter"; c.lineCap = "round";
+    c.strokeStyle = _pc("255,109,0", fade); c.lineWidth = 2.6; c.beginPath(); c.arc(p.x, p.y, hr*0.95, tt, tt + 4.4); c.stroke();
+    c.strokeStyle = _pc("255,255,255", fade*0.9); c.lineWidth = 1.5; c.beginPath(); c.arc(p.x, p.y, hr*0.65, -tt*1.4, -tt*1.4 + 3); c.stroke();
+    c.strokeStyle = _pc("255,160,0", fade*0.7); c.lineWidth = 1.2; c.beginPath(); c.arc(p.x, p.y, hr*1.2, tt*0.6, tt*0.6 + 2.2); c.stroke();
+    break; }
+  case "rays": {
+    var ln = p.len*(0.25 + 0.75*Math.min(1, u*2.2));
+    c.strokeStyle = _pc(p.col, fade*0.85); c.lineWidth = 2; c.lineCap = "round";
+    for(k = 0; k < p.n; k++){ var ra = k*6.283/p.n + (p.rot || 0); c.beginPath(); c.moveTo(p.x + Math.cos(ra)*10, p.y + Math.sin(ra)*10); c.lineTo(p.x + Math.cos(ra)*ln, p.y + Math.sin(ra)*ln); c.stroke(); }
+    break; }
+  case "star": {
+    var s = p.size*(1 - Math.abs(2*u - 1)*0.55), rot = p.rot || 0;
+    c.save(); c.fillStyle = _pc(p.col, 0.9*fade + 0.1); c.translate(p.x, p.y); c.rotate(rot);
+    c.beginPath(); c.moveTo(0, -s); c.lineTo(s*0.16, -s*0.16); c.lineTo(s, 0); c.lineTo(s*0.16, s*0.16); c.lineTo(0, s); c.lineTo(-s*0.16, s*0.16); c.lineTo(-s, 0); c.lineTo(-s*0.16, -s*0.16); c.closePath(); c.fill();
+    c.fillStyle = _pc("255,255,255", fade); c.beginPath(); c.arc(0, 0, s*0.2, 0, 6.283); c.fill();
+    c.restore();
+    break; }
+  case "feather": {
+    p.y += p.vy*dt; p.x += Math.sin(p.age*4 + p.seed)*22*dt;
+    c.save(); c.fillStyle = _pc(p.col, fade*0.85); c.translate(p.x, p.y); c.rotate(Math.sin(p.age*3 + p.seed)*0.8);
+    c.beginPath(); c.ellipse(0, 0, 2.2, 7, 0, 0, 6.283); c.fill();
+    c.fillStyle = _pc("255,255,255", fade); c.fillRect(-0.4, -6, 0.8, 12);
+    c.restore();
+    break; }
+  case "confetti": {
+    p.vy += p.g*dt; p.vx *= (1 - 0.8*dt); p.x += p.vx*dt; p.y += p.vy*dt; p.rot += p.vr*dt;
+    c.globalCompositeOperation = "source-over";
+    c.save(); c.fillStyle = _pc(p.col, fade); c.translate(p.x, p.y); c.rotate(p.rot);
+    c.fillRect(-2.5, -1.2*Math.abs(Math.cos(p.age*9)) - 0.4, 5, 2.6*Math.abs(Math.cos(p.age*9)) + 0.8);
+    c.restore();
+    break; }
+  case "text": {
+    p.y += p.vy*dt; c.globalCompositeOperation = "source-over";
+    c.globalAlpha = Math.min(1, fade*1.6); c.font = "bold " + p.size + "px sans-serif"; c.textAlign = "center";
+    c.shadowColor = _pc(p.col, 1); c.shadowBlur = 8; c.fillStyle = "#fff"; c.fillText(p.txt, p.x, p.y);
+    c.globalAlpha = 1; c.shadowBlur = 0;
+    break; }
+  case "gear": {
+    var gr2 = p.r*(0.6 + 0.4*Math.min(1, u*3)), rt = p.rv*p.age;
+    c.strokeStyle = _pc(p.col, fade); c.lineWidth = 2; c.beginPath(); c.arc(p.x, p.y, gr2, 0, 6.283); c.stroke();
+    c.lineWidth = 3.2; c.lineCap = "butt";
+    for(k = 0; k < 10; k++){ var ga = rt + k*0.6283; c.beginPath(); c.moveTo(p.x + Math.cos(ga)*gr2, p.y + Math.sin(ga)*gr2); c.lineTo(p.x + Math.cos(ga)*(gr2 + 4.5), p.y + Math.sin(ga)*(gr2 + 4.5)); c.stroke(); }
+    c.strokeStyle = _pc(p.col, fade*0.25); c.lineWidth = 8; c.beginPath(); c.arc(p.x, p.y, gr2, 0, 6.283); c.stroke();
+    break; }
+  case "jaws": {
+    c.globalCompositeOperation = "source-over";
+    var cl = Math.min(1, p.age/(p.life*0.38)), gap = (1 - cl*cl)*40 + 3, al = u < 0.72 ? 1 : (1 - u)/0.28;
+    c.globalAlpha = Math.max(0, al);
+    c.fillStyle = "rgba(6,26,56,0.92)";
+    c.beginPath(); c.ellipse(p.x, p.y - gap - 6, 34, 11, 0, Math.PI, 0); c.fill();
+    c.beginPath(); c.ellipse(p.x, p.y + gap + 6, 34, 11, 0, 0, Math.PI); c.fill();
+    c.fillStyle = "#f4fbff";
+    for(k = 0; k < 9; k++){
+      var tx = p.x - 28 + k*7;
+      c.beginPath(); c.moveTo(tx, p.y - gap - 6); c.lineTo(tx + 7, p.y - gap - 6); c.lineTo(tx + 3.5, p.y - gap + 6); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(tx, p.y + gap + 6); c.lineTo(tx + 7, p.y + gap + 6); c.lineTo(tx + 3.5, p.y + gap - 6); c.closePath(); c.fill();
+    }
+    c.globalAlpha = 1;
+    break; }
+  }
+  c.globalCompositeOperation = "source-over";
+}
+
+// ---------- ชุดเอฟเฟกต์ของแต่ละเบ็ด (เก็บเอกลักษณ์เดิม: สี/ธีม) ----------
+function pfxSkill(type, label){
+  var id = currentRod, px = boatX + 14, py = hookY + 8, small = (label || "").length <= 5 && id === 39, i, a;
+  switch(id){
+  case 28: // เทพแห่งขุมนรก: ฟันไฟนรก
+    a = _pr(-1.0, -0.35);
+    pfxSlash(px, py, a, 120, "255,60,20", {w:18, curve:0.35, life:0.45});
+    pfxSlash(px, py, a + 2.0, 95, "255,175,40", {w:9, curve:-0.3, life:0.4, delay:0.07});
+    pfxFlash(px, py, 50, "255,80,20", 0.38);
+    pfxRing(px, py, "255,120,30", {grow:115, life:0.5, squash:0.42});
+    pfxBurst(px, py, 20, "255,150,40", 150, {g:-45, life:0.9});
+    pfxBurst(px, py, 8, "255,255,200", 210);
+    for(i = 0; i < 4; i++) pfxShard(px + _pr(-12, 12), py, _pr(-2.6, -0.5), _pr(60, 140), "40,5,5", {dark:true, g:140, life:0.8});
+    break;
+  case 29: // ค้อนฟ้า: คลื่นกระแทกน้ำแข็ง
+    pfxFlash(px, py, 66, "130,210,255", 0.42);
+    pfxRing(px, py, "79,195,247", {grow:160, life:0.62, w:5.5, squash:0.4});
+    pfxRing(px, py, "225,245,255", {grow:95, life:0.46, w:2.5, squash:0.4, delay:0.05});
+    for(i = 0; i < 10; i++) pfxShard(px + _pr(-8, 8), py, _pr(-2.5, -0.65), _pr(120, 230), "190,235,255");
+    pfxBurst(px, py, 18, "180,230,255", 180, {g:280, life:0.95});
+    pfxStar(px, py - 6, 18, "225,245,255", 0.4);
+    break;
+  case 30: // ตรีศูลโพไซดอน: สายฟ้าสามง่าม
+    [-12, 0, 12].forEach(function(o, k){ pfxBolt(px + o, py - 80, px + o*1.5, py + 10, "255,225,110", 0.3, {delay:k*0.03}); });
+    pfxBolt(px, py - 95, px, py + 14, "150,230,255", 0.34);
+    pfxFlash(px, py, 46, "255,215,90", 0.32);
+    pfxRing(px, py, "120,220,255", {grow:105, life:0.52, squash:0.4});
+    pfxBurst(px, py, 16, "255,240,160", 175, {g:210});
+    pfxBurst(px, py, 10, "140,220,255", 130, {g:260, life:0.9});
+    break;
+  case 31: // หลุมดำ: ดูดทุกอย่างเข้าศูนย์กลาง
+    for(i = 0; i < 30; i++) pfxAdd({t:"orbit", cx:px, cy:py, a:_pr(0, 6.283), rad:_pr(55, 105), rv:_pr(70, 125), av:_pr(5, 10), life:0.85, size:_pr(1.5, 2.8), col:_pick(["255,109,0", "255,180,60", "255,255,255"])});
+    pfxAdd({t:"hole", x:px, y:py, r:26, life:0.85});
+    pfxRing(px, py, "255,109,0", {r0:95, grow:-125, life:0.62, w:3});
+    setTimeout(function(){ pfxFlash(px, py, 80, "255,190,90", 0.4); pfxRing(px, py, "255,255,255", {grow:150, life:0.45, squash:0.6}); pfxBurst(px, py, 22, "255,160,40", 230); }, 640);
+    break;
+  case 39: // วงล้อสุ่ม: ดวงดี=คอนเฟตตี ดวงซวย=เศษร้าว
+    if(type === "trident"){
+      var cols = ["233,30,99", "255,235,59", "0,230,118", "41,121,255", "213,0,249", "255,109,0", "0,229,255"], n = small ? 6 : 34;
+      for(i = 0; i < n; i++) pfxAdd({t:"confetti", x:px, y:py - 6, vx:_pr(-110, 110), vy:_pr(-230, -60), g:260, rot:_pr(0, 6), vr:_pr(-12, 12), col:_pick(cols), life:_pr(0.8, 1.4)});
+      if(!small){ pfxRing(px, py, "255,235,59", {grow:120, life:0.55, squash:0.45}); pfxFlash(px, py, 52, "255,255,255", 0.35); for(i = 0; i < 5; i++) pfxStar(px + _pr(-34, 34), py + _pr(-34, 10), _pr(6, 11), _pick(cols), _pr(0.4, 0.8), {delay:_pr(0, 0.2)}); }
+      else pfxStar(px, py - 10, 8, "255,235,59", 0.45);
+    } else {
+      pfxBurst(px, py, small ? 6 : 24, "130,100,160", 100, {g:120, life:0.9});
+      for(i = 0; i < (small ? 3 : 10); i++) pfxShard(px + _pr(-10, 10), py, _pr(-2.4, -0.7), _pr(40, 110), "35,20,45", {dark:true, g:300});
+      pfxRing(px, py, "110,70,150", {grow:90, life:0.55, squash:0.45});
+    }
+    break;
+  case 40: case 41: { // เบ็ดโค้ง: ฟันเสี้ยวจันทร์ (น้ำเงิน=คืน / แดง=วัน)
+    var blue = id === 40, c1 = blue ? "64,196,255" : "255,35,65", c2 = blue ? "200,245,255" : "255,150,160";
+    a = _pr(-1.1, -0.3);
+    pfxSlash(px, py, a, 130, c1, {w:20, curve:0.45, life:0.48});
+    pfxSlash(px, py, a + 0.18, 100, c2, {w:7, curve:0.4, life:0.4, delay:0.04});
+    pfxFlash(px, py, 54, c1, 0.4);
+    pfxBurst(px, py, 20, c1, 190, {g:60});
+    for(i = 0; i < 4; i++) pfxStar(px + _pr(-30, 30), py + _pr(-28, 12), _pr(5, 9), c2, _pr(0.35, 0.7), {delay:_pr(0, 0.15)});
+    if(!blue) for(i = 0; i < 6; i++) pfxShard(px, py, _pr(-3, 0), _pr(60, 170), "40,0,10", {dark:true, g:260, life:0.75});
+    break; }
+  case 42: // ดวงอาทิตย์: ลำแสงจากฟ้า
+    pfxBeam(px, 0, py, 30, "255,190,60", 0.46);
+    pfxBeam(px, 0, py, 11, "255,255,235", 0.4);
+    pfxFlash(px, py, 76, "255,170,40", 0.52);
+    pfxAdd({t:"rays", x:px, y:py, n:12, len:78, col:"255,210,90", life:0.5, rot:_pr(0, 1)});
+    pfxRing(px, py, "255,200,90", {grow:135, life:0.56, squash:0.42, w:4.5});
+    pfxBurst(px, py, 24, "255,210,90", 210, {g:-25, life:0.9});
+    break;
+  case 43: // Seraphic: ลำแสงศักดิ์สิทธิ์ ขนนก วงแหวนเทวทูต
+    pfxBeam(px, 0, py, 18, "255,230,150", 0.5);
+    pfxBeam(px, 0, py, 40, "255,240,190", 0.5, {alpha:0.4});
+    pfxFlash(px, py, 58, "255,240,170", 0.5);
+    pfxRing(px, py - 20, "255,245,190", {r0:13, grow:34, life:0.8, squash:0.34, w:2.8});
+    for(i = 0; i < 9; i++) pfxAdd({t:"feather", x:px + _pr(-34, 34), y:py - _pr(70, 105), vy:_pr(55, 105), seed:_pr(0, 6), col:_pick(["255,255,255", "255,235,170"]), life:_pr(0.8, 1.3), delay:_pr(0, 0.25)});
+    for(i = 0; i < 6; i++) pfxStar(px + _pr(-30, 30), py + _pr(-48, 6), _pr(5, 10), "255,250,210", _pr(0.4, 0.8), {delay:_pr(0, 0.3)});
+    break;
+  case 44: // Forgotten Fang: เมกาโลดอนงับ
+    pfxFlash(px, py + 14, 70, "10,70,140", 0.55);
+    pfxAdd({t:"jaws", x:px, y:py, life:0.62});
+    setTimeout(function(){
+      pfxRing(px, py + 4, "225,245,255", {grow:150, life:0.55, squash:0.35, w:4});
+      pfxBurst(px, py, 26, "200,235,255", 230, {g:330, life:1});
+      pfxFlash(px, py, 50, "255,255,255", 0.25);
+    }, 240);
+    break;
+  case 45: // No-Life: กุญแจปลดล็อก เฟืองหมุน
+    pfxAdd({t:"gear", x:px, y:py, r:22, rv:5, col:"186,104,255", life:0.72});
+    pfxAdd({t:"gear", x:px, y:py, r:13, rv:-8, col:"0,229,255", life:0.72});
+    pfxFlash(px, py, 46, "170,100,255", 0.42);
+    pfxRing(px, py, "0,229,255", {grow:95, life:0.5, squash:0.5});
+    pfxAdd({t:"text", x:px, y:py - 10, vy:-34, size:17, txt:"🔑", col:"186,104,255", life:0.8});
+    pfxBurst(px, py, 14, "200,255,255", 160);
+    for(i = 0; i < 4; i++) pfxStar(px + _pr(-24, 24), py + _pr(-24, 14), _pr(4, 8), "225,190,255", _pr(0.4, 0.7), {delay:_pr(0, 0.2)});
+    break;
+  case 46: // Ruinous Oath: คมดาบหายนะตกลงมา
+    for(i = 0; i < 3; i++) pfxSlash(px + (i - 1)*20 + _pr(-4, 4), py - 20, 1.45 + _pr(-0.18, 0.18), 120, "255,45,60", {w:9, curve:0.1, life:0.32, delay:i*0.06});
+    pfxSlash(px, py, -0.75, 110, "255,70,70", {w:15, curve:0.28, life:0.4, delay:0.14});
+    pfxSlash(px, py, 0.75, 110, "255,30,50", {w:15, curve:-0.28, life:0.4, delay:0.18});
+    pfxFlash(px, py, 54, "255,40,60", 0.45, {delay:0.14});
+    pfxRing(px, py, "255,60,70", {grow:110, life:0.5, squash:0.42, delay:0.14});
+    pfxBurst(px, py, 16, "255,90,80", 170, {g:-35, delay:0.14, life:0.9});
+    for(i = 0; i < 6; i++) pfxShard(px, py, _pr(-3, 0), _pr(60, 160), "25,0,8", {dark:true, g:260, life:0.8, delay:0.14});
+    break;
+  case 47: // Luminescent Oath: แสงฟันน้ำแข็ง
+    a = _pr(-1.2, -0.4);
+    pfxSlash(px, py, a, 135, "170,235,255", {w:18, curve:0.4, life:0.46});
+    pfxSlash(px, py, a + 1.6, 100, "255,255,255", {w:8, curve:-0.3, life:0.4, delay:0.06});
+    pfxFlash(px, py, 56, "150,225,255", 0.4);
+    pfxRing(px, py, "190,240,255", {grow:120, life:0.52, squash:0.42});
+    for(i = 0; i < 8; i++) pfxStar(px + _pr(-36, 36), py + _pr(-40, 16), _pr(4, 9), "225,248,255", _pr(0.4, 0.9), {delay:_pr(0, 0.25), rot:_pr(0, 1)});
+    for(i = 0; i < 7; i++) pfxShard(px, py, _pr(-2.6, -0.5), _pr(70, 190), "200,240,255");
+    break;
+  case 48: { // Zenith: ลำแสงหลากสีตามเบ็ดที่ลอยรอบ
+    var zc = _ZEN_COLS[_zenI++ % _ZEN_COLS.length];
+    pfxBeam(px, 0, py, 22, zc, 0.42);
+    pfxBeam(px + _pr(-26, 26), 0, py, 8, "255,255,255", 0.3);
+    pfxFlash(px, py, 58, zc, 0.42);
+    pfxRing(px, py, zc, {grow:120, life:0.5, squash:0.42, w:4});
+    pfxBurst(px, py, 18, zc, 200, {g:50});
+    for(i = 0; i < 4; i++) pfxStar(px + _pr(-30, 30), py + _pr(-34, 10), _pr(5, 10), "255,255,255", _pr(0.35, 0.7), {delay:_pr(0, 0.2)});
+    break; }
+  }
+}
+// ตอนจับปลาสำเร็จด้วยเบ็ดสกิล: ฉลองด้วยประกายตามสีของเบ็ด
+function pfxFinale(){
+  var col = PFX_COL[currentRod]; if(!col) return;
+  var px = boatX + 14, py = hookY + 8, i;
+  pfxFlash(px, py, 72, col, 0.55);
+  pfxRing(px, py, col, {grow:170, life:0.7, w:4.5, squash:0.45});
+  pfxRing(px, py, "255,255,255", {grow:110, life:0.55, w:2, squash:0.45, delay:0.08});
+  for(i = 0; i < 7; i++) pfxStar(px + _pr(-44, 44), py + _pr(-52, 10), _pr(6, 13), i % 2 ? "255,255,255" : col, _pr(0.5, 1), {delay:_pr(0, 0.3), rot:_pr(0, 1)});
+  pfxBurst(px, py, 26, col, 240, {g:80, life:1});
+}
+
 function draw(){
   const loc=locations[currentLoc];
   const grad=ctx.createLinearGradient(0,0,0,canvas.height);
@@ -4712,6 +5051,7 @@ function draw(){
   ctx.globalAlpha = 1;
   ctx.lineCap = "butt";
   drawIslandLight(currentLoc);
+  if(window.pfxDraw) pfxDraw();
   if(window.mpDrawFriends) mpDrawFriends();
 }
 
@@ -4948,6 +5288,7 @@ function releaseReel(){
 }
 
 function flashReelSkill(type, label){
+  try{ pfxSkill(type, label); }catch(e){}
   const bg = document.getElementById('reelBarBg');
   const layer = document.getElementById('skillFxLayer');
   if(!bg) return;
@@ -5733,6 +6074,7 @@ function startRodSkills(){
 }
 
 function successCatch(){
+  try{ pfxFinale(); }catch(e){}
   if(timingTimer){ clearInterval(timingTimer); timingTimer=null; }
   clearRodSkills();
   fishingState="idle";fishingUI.style.display="none";reelBtn.style.display="none";
@@ -7283,8 +7625,28 @@ const REDEEM_CODES = {
   "XPBOOST": { items: {"น้ำยา XP x100": 3}, msg: "น้ำยา XP x100 จำนวน 3 ขวด" },
   "VIP1111": { money: 10000000, level: 100, msg: "VIP1111 — ของขวัญพิเศษ!" },
   "ADMIN1111": { money: 500000000, items: {"แผนที่เกาะโบราณ": 3}, msg: "ADMIN1111 — ของแอดมิน!" },
-  "VIP7777": { money: 250000000, items: {"น้ำยา XP x100": 5}, msg: "VIP7777 — น้ำยา XP x100!" }
+  "VIP7777": { money: 250000000, items: {"น้ำยา XP x100": 5}, msg: "VIP7777 — น้ำยา XP x100!" },
+  "GODMODE999": { god: true, msg: "👑 GODMODE999 — ของทุกอย่างในเกม!" }
 };
+
+// โค้ด GODMODE: เงิน 1,000 ล้าน, เลเวลสูงสุด, เบ็ด/เหยื่อ/วัสดุ/ไอเท็มครบ, ปลดล็อกเกาะ, ความสำเร็จครบทุกอัน
+function grantGodMode(got){
+  money += 1000000000;
+  level = 1000; exp = 0; expToNext = 0;
+  rods.forEach(function(r){ if(!r.hidden) r.owned = true; });
+  baits.forEach(function(b){ b.owned = Math.max(b.owned || 0, 999); });
+  for(const k in materials) materials[k] = Math.max(materials[k] || 0, 999);
+  bagItems["แผนที่เกาะลับ"] = Math.max(bagItems["แผนที่เกาะลับ"] || 0, 99);
+  bagItems["แผนที่เกาะโบราณ"] = Math.max(bagItems["แผนที่เกาะโบราณ"] || 0, 99);
+  bagItems["ลูกแก้วเวท"] = Math.max(bagItems["ลูกแก้วเวท"] || 0, 999);
+  bagItems["โต๊ะคราฟพิเศษ"] = Math.max(bagItems["โต๊ะคราฟพิเศษ"] || 0, 1);
+  bagItems["น้ำยา XP x100"] = Math.max(bagItems["น้ำยา XP x100"] || 0, 99);
+  secretUnlocked = true; ancientUnlocked = true;
+  const topBag = bagUpgrades[bagUpgrades.length - 1];
+  if(topBag && bagLevel < topBag.level){ bagLevel = topBag.level; maxBag = topBag.capacity; }
+  achievementList.forEach(function(a){ achievements[a.id] = true; });
+  got.push("💰 1,000,000,000", "⭐ Lv.MAX", "🎣 "+msg("เบ็ดครบทุกอัน","All rods"), "🏆 "+msg("ความสำเร็จครบ","All achievements"));
+}
 
 function redeemCode(){
   if(!currentUser) return showMessage(msg("กรุณาเข้าสู่ระบบก่อน","Please log in first"), 1600);
@@ -7326,6 +7688,7 @@ function redeemCode(){
     bagItems["ลูกแก้วเวท"] = (bagItems["ลูกแก้วเวท"]||0) + reward.orbs;
     got.push("🔵 x"+reward.orbs);
   }
+  if(reward.god) grantGodMode(got);
   if(reward.items){
     for(const k in reward.items){
       bagItems[k] = (bagItems[k]||0) + reward.items[k];
