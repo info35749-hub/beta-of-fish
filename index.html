@@ -25,7 +25,23 @@
   #craftBtn{background:linear-gradient(180deg,#6d1b1b,#2a0000)}
   #invBtn{background:linear-gradient(180deg,#c62828,#5d0000)!important}
   #settingsBtn{background:linear-gradient(180deg,#37474f,#102027)!important;border:1px solid #78909c}
-  #panel{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(8,0,0,.94);z-index:30;padding:12px;overflow-y:auto}
+  #panel{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(8,0,0,.94);z-index:58;padding:0 12px 0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  body:has(#panel[style*="display: block"]) :is(#mpBtn,#userBar,#megaTimer){display:none!important}
+  #panelHead{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:8px;height:48px;background:rgba(14,0,0,.98);border-bottom:1px solid #5d1010;margin:0 -12px;padding:0 12px}
+  #panelHead h2{margin:0!important;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #closeX{flex:none;background:linear-gradient(180deg,#ff1744,#9a0007);border:1px solid #ff8a80;color:#fff;border-radius:18px;padding:7px 14px;font-size:.9rem;font-weight:bold}
+  #panelContent .tabsbar{position:sticky;top:48px;z-index:4;display:flex;gap:6px;overflow-x:auto;padding:8px 12px;margin:0 -12px 6px;background:rgba(14,0,0,.97);border-bottom:1px solid #3a0a0a;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  #panelContent .tabsbar::-webkit-scrollbar{display:none}
+  #panelContent .tabchip{flex:none;border:1px solid #7f1d1d;background:#2a0a0a;color:#ffcdd2;border-radius:16px;padding:6px 12px;font-size:.82rem;white-space:nowrap}
+  #panelContent .tabchip.on{background:linear-gradient(180deg,#ff1744,#b71c1c);border-color:#ff8a80;color:#fff;font-weight:bold;box-shadow:0 0 8px rgba(255,23,68,.5)}
+  #panelContent .slotgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:4px 0}
+  #panelContent .slotgrid>.item{margin:0;flex-direction:column;align-items:stretch;justify-content:space-between;text-align:center;gap:6px;padding:8px 6px;min-height:78px}
+  #panelContent .slotgrid>.item>*{max-width:100%}
+  #panelContent .slotgrid>.item button{width:100%}
+  #panelContent .slotgrid>.item .item-info{word-break:break-word}
+  #panelContent .grp .section-title{display:none}
+  #panel .closeBtn{position:sticky;bottom:0;z-index:5;margin:10px 0 0;box-shadow:0 -6px 12px rgba(8,0,0,.9)}
+  #mpPanel>div:first-child{position:sticky;top:0;z-index:3;background:rgba(8,20,36,.99);padding:4px 0}
   #panel h2{margin-bottom:8px;font-size:1.15rem;color:#ff1744;text-shadow:0 0 8px rgba(255,23,68,0.4)}
   .section-title{margin:12px 0 6px;font-size:.95rem;color:#ff8a80;border-left:3px solid #ff1744;padding-left:8px}
   .item{background:linear-gradient(90deg,#1a0505,#2a0a0a);margin:4px 0;padding:8px 10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:5px;border:1px solid #5d1010}
@@ -471,7 +487,7 @@
   </div>
 
   <div id="panel">
-    <h2 id="panelTitle">ร้านค้า</h2>
+    <div id="panelHead"><h2 id="panelTitle">ร้านค้า</h2><button id="closeX">✕ ปิด</button></div>
     <div id="panelContent"></div>
     <button class="closeBtn" id="closePanel">ปิด</button>
   </div>
@@ -535,9 +551,9 @@ function buildBus(){
   const hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 28;
   const shelf = c.createBiquadFilter(); shelf.type = "highshelf"; shelf.frequency.value = 9000; shelf.gain.value = -3;
   const comp = c.createDynamicsCompressor();
-  comp.threshold.value = -22; comp.knee.value = 20; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.25;
+  comp.threshold.value = -12; comp.knee.value = 24; comp.ratio.value = 3; comp.attack.value = 0.004; comp.release.value = 0.25;
   const lim = c.createDynamicsCompressor();
-  lim.threshold.value = -4; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
+  lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
   masterBus.connect(hp); hp.connect(shelf); shelf.connect(comp); comp.connect(lim); lim.connect(c.destination);
   reverbSend = c.createGain();
   const cs = c.createConvolver(); cs.buffer = makeIR(c, 1.1, 3.0, 7);
@@ -827,18 +843,18 @@ function loopLayer(o){
     h.stopList.push(src);
   });
   out(g, o.wet || 0, 0);
-  const t = c.currentTime, tgt = vol*(sides.length > 1 ? 0.75 : 1);
+  const t = c.currentTime, tgt = vol*1.35*(sides.length > 1 ? 0.75 : 1);   // ฐานเสียงต่อเนื่องให้ได้ยินตลอด
   g.gain.linearRampToValueAtTime(tgt, t + 1.6);
   if(o.lfoRate){
     const l = c.createOscillator(); l.frequency.value = o.lfoRate;
     const lg = c.createGain();
     if(o.lfoTarget === "freq"){ lg.gain.value = (o.freq || 800)*(o.lfoDepth || 0.4); l.connect(lg); filters.forEach(function(f){ lg.connect(f.frequency); }); }
-    else { lg.gain.value = tgt*(o.lfoDepth || 0.6); l.connect(lg); lg.connect(g.gain); }
+    else { lg.gain.value = tgt*Math.min(0.35, o.lfoDepth || 0.35); l.connect(lg); lg.connect(g.gain); }
     l.start(); h.stopList.push(l);
   }
   if(o.drift){                                   // ความดังเปลี่ยนไปเรื่อยๆ ไม่ซ้ำกัน
     sched(function(){
-      g.gain.setTargetAtTime(tgt*_rnd(1 - o.drift, 1 + o.drift*0.4), audioCtx.currentTime, 1.4);
+      g.gain.setTargetAtTime(tgt*_rnd(1 - Math.min(0.25, o.drift*0.4), 1 + o.drift*0.3), audioCtx.currentTime, 1.4);
       if(o.type === "bandpass" && o.freq) filters.forEach(function(f){ f.frequency.setTargetAtTime(o.freq*_rnd(0.8, 1.3), audioCtx.currentTime, 1.8); });
     }, 2500, 6000, true);
   }
@@ -905,7 +921,7 @@ function startAmbient(loc, weather){
 
   switch(loc){
   case 0: // ชายหาด
-    loopLayer({kind:"pink", type:"lowpass", freq:520, vol:0.06, lfoRate:0.09, lfoDepth:0.4, drift:0.4});
+    loopLayer({kind:"pink", type:"lowpass", freq:520, vol:0.04, lfoRate:0.09, lfoDepth:0.4, drift:0.4});
     loopLayer({kind:"white", type:"highpass", freq:4200, vol:0.01, drift:0.5});
     loopLayer({kind:"pink", type:"bandpass", freq:900, q:0.7, vol:0.012, drift:0.7});   // ลมเบา
     sched(function(){ waveSurge(_rnd(0.8, 1.2)); }, 5500, 9500, true);
@@ -983,8 +999,8 @@ function startAmbient(loc, weather){
     sched(function(){ tone(55, 0.22, {vol: 0.12}); tone(55, 0.22, {vol: 0.09, delay: 0.3}); }, 8000, 14000, true);
     break;
   case 8: // เกาะโบราณ
-    loopLayer({kind:"pink", type:"bandpass", freq:700, q:1.4, vol:0.075, drift:0.7});
-    loopLayer({kind:"pink", type:"lowpass", freq:350, vol:0.05, drift:0.5});
+    loopLayer({kind:"pink", type:"bandpass", freq:700, q:1.4, vol:0.045, drift:0.7});
+    loopLayer({kind:"pink", type:"lowpass", freq:350, vol:0.03, drift:0.5});
     sched(function(){ windGust(0.7, false); }, 7000, 15000, true);
     sched(function(){ crackle(0.022, 2500, 7000); }, 220, 1000);
     sched(function(){ bell(98, 0.09, {wet: 0.9, len: 2.4}); }, 14000, 26000);
@@ -1261,6 +1277,12 @@ document.addEventListener("visibilitychange", function(){
 ["pointerdown","keydown","touchstart"].forEach(function(ev){
   document.addEventListener(ev, function(){ if(audioCtx && audioCtx.state === "suspended" && !document.hidden && soundEnabled) audioCtx.resume(); }, {passive:true});
 });
+
+// กันเสียงเงียบกลางคัน: เบราว์เซอร์มือถือชอบพักระบบเสียงเอง ให้ปลุกกลับอัตโนมัติ
+setInterval(function(){
+  if(!audioCtx || !soundEnabled || document.hidden) return;
+  if(audioCtx.state === "suspended" || audioCtx.state === "interrupted") audioCtx.resume().catch(function(){});
+}, 2000);
 
 const weatherInfo=document.getElementById('weatherInfo');
 
@@ -3769,501 +3791,7 @@ function rzFront(loc){
   }
 }
 
-function draw(){
-  const loc=locations[currentLoc];
-  const grad=ctx.createLinearGradient(0,0,0,canvas.height);
-
-  // สีต่างกันตามสถานที่ + กลางวัน/กลางคืน
-  if(currentLoc===0){ // ชายหาด
-    if(isDay){ grad.addColorStop(0,"#81d4fa"); grad.addColorStop(0.5,"#4fc3f7"); grad.addColorStop(1,"#0288d1"); }
-    else { grad.addColorStop(0,"#1a237e"); grad.addColorStop(1,"#0d47a1"); }
-  } else if(currentLoc===1){ // เกาะลึกลับ
-    if(isDay){ grad.addColorStop(0,"#80cbc4"); grad.addColorStop(0.4,"#26a69a"); grad.addColorStop(1,"#00695c"); }
-    else { grad.addColorStop(0,"#004d40"); grad.addColorStop(1,"#00251a"); }
-  } else if(currentLoc===2){ // ทะเลลึก
-    if(isDay){ grad.addColorStop(0,"#5c6bc0"); grad.addColorStop(0.5,"#303f9f"); grad.addColorStop(1,"#1a237e"); }
-    else { grad.addColorStop(0,"#0d1b2a"); grad.addColorStop(1,"#000814"); }
-  } else if(currentLoc===3){ // เกาะลับ
-    if(isDay){ grad.addColorStop(0,"#e1bee7"); grad.addColorStop(0.4,"#ce93d8"); grad.addColorStop(1,"#8e24aa"); }
-    else { grad.addColorStop(0,"#4a148c"); grad.addColorStop(1,"#1a0033"); }
-  } else if(currentLoc===4){ // ซากใต้น้ำ
-    if(isDay){ grad.addColorStop(0,"#ffab91"); grad.addColorStop(0.4,"#ff7043"); grad.addColorStop(1,"#d84315"); }
-    else { grad.addColorStop(0,"#bf360c"); grad.addColorStop(1,"#3e2723"); }
-  } else if(currentLoc===5){ // บึงลึกลับ
-    if(isDay){ grad.addColorStop(0,"#c5e1a5"); grad.addColorStop(0.4,"#9ccc65"); grad.addColorStop(1,"#558b2f"); }
-    else { grad.addColorStop(0,"#33691e"); grad.addColorStop(1,"#1b5e20"); }
-  } else if(currentLoc===6){ // ทะเลน้ำแข็ง
-    if(isDay){ grad.addColorStop(0,"#e1f5fe"); grad.addColorStop(0.4,"#81d4fa"); grad.addColorStop(1,"#0288d1"); }
-    else { grad.addColorStop(0,"#01579b"); grad.addColorStop(1,"#002f6c"); }
-  } else if(currentLoc===7){ // มิติมืด
-    if(isDay){ grad.addColorStop(0,"#7b1fa2"); grad.addColorStop(0.5,"#4a148c"); grad.addColorStop(1,"#1a0033"); }
-    else { grad.addColorStop(0,"#12001a"); grad.addColorStop(1,"#000000"); }
-  } else if(currentLoc===8){ // เกาะโบราณ
-    if(isDay){
-      grad.addColorStop(0,"#fff8e1");
-      grad.addColorStop(0.25,"#d7ccc8");
-      grad.addColorStop(0.55,"#a1887f");
-      grad.addColorStop(1,"#4e342e");
-    } else {
-      grad.addColorStop(0,"#5d4037");
-      grad.addColorStop(0.5,"#3e2723");
-      grad.addColorStop(1,"#1a0a00");
-    }
-  } else if(currentLoc===9){ // ถ้ำน้ำวน
-    if(isDay){ grad.addColorStop(0,"#e0f7fa"); grad.addColorStop(0.25,"#4dd0e1"); grad.addColorStop(0.55,"#00acc1"); grad.addColorStop(1,"#004d40"); }
-    else { grad.addColorStop(0,"#00695c"); grad.addColorStop(0.5,"#004d40"); grad.addColorStop(1,"#001a14"); }
-  } else if(currentLoc===10){ // แท่นเสริมพลัง
-    if(isDay){
-      grad.addColorStop(0,"#f3e5f5");
-      grad.addColorStop(0.25,"#ce93d8");
-      grad.addColorStop(0.55,"#7e57c2");
-      grad.addColorStop(1,"#1a0033");
-    } else {
-      grad.addColorStop(0,"#6a1b9a");
-      grad.addColorStop(0.4,"#4a148c");
-      grad.addColorStop(1,"#0d001a");
-    }
-  } else if(currentLoc===11){ // เกาะลาวา
-    if(isDay){
-      grad.addColorStop(0,"#ffe0b2");
-      grad.addColorStop(0.3,"#ff8a65");
-      grad.addColorStop(0.65,"#e64a19");
-      grad.addColorStop(1,"#bf360c");
-    } else {
-      grad.addColorStop(0,"#bf360c");
-      grad.addColorStop(0.5,"#6d1b00");
-      grad.addColorStop(1,"#1a0500");
-    }
-  } else if(currentLoc===12){ // เกาะสายรุ้ง
-    if(isDay){
-      grad.addColorStop(0,"#fce4ec");
-      grad.addColorStop(0.25,"#f8bbd0");
-      grad.addColorStop(0.5,"#ce93d8");
-      grad.addColorStop(0.75,"#90caf9");
-      grad.addColorStop(1,"#80cbc4");
-    } else {
-      grad.addColorStop(0,"#4a148c");
-      grad.addColorStop(0.5,"#1a237e");
-      grad.addColorStop(1,"#004d40");
-    }
-  } else if(currentLoc===13){ // ออบซิเดียน
-    if(isDay){
-      grad.addColorStop(0,"#78909c");
-      grad.addColorStop(0.4,"#455a64");
-      grad.addColorStop(1,"#212121");
-    } else {
-      grad.addColorStop(0,"#263238");
-      grad.addColorStop(1,"#000000");
-    }
-  } else if(currentLoc===14){ // ทะเลเมฆ
-    if(isDay){
-      grad.addColorStop(0,"#ffffff");
-      grad.addColorStop(0.35,"#e3f2fd");
-      grad.addColorStop(0.7,"#90caf9");
-      grad.addColorStop(1,"#64b5f6");
-    } else {
-      grad.addColorStop(0,"#37474f");
-      grad.addColorStop(0.5,"#1a237e");
-      grad.addColorStop(1,"#0d47a1");
-    }
-  } else {
-    if(isDay){ grad.addColorStop(0,"#81d4fa"); grad.addColorStop(1,"#0288d1"); }
-    else { grad.addColorStop(0,"#1a237e"); grad.addColorStop(1,"#0d47a1"); }
-  }
-  ctx.fillStyle=grad;ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  // ดวงอาทิตย์ / ดวงจันทร์ จัดเต็ม
-  if(isDay){
-    // ท้องฟ้าเรืองจากดวงอาทิตย์
-    const skyGlow = ctx.createRadialGradient(300, 30, 5, 300, 50, 220);
-    skyGlow.addColorStop(0, "rgba(255,250,200,0.45)");
-    skyGlow.addColorStop(0.3, "rgba(255,220,120,0.2)");
-    skyGlow.addColorStop(0.65, "rgba(255,180,80,0.06)");
-    skyGlow.addColorStop(1, "rgba(255,150,50,0)");
-    ctx.fillStyle = skyGlow;
-    ctx.fillRect(0, 0, canvas.width, 120);
-
-    // God rays
-    ctx.save();
-    ctx.translate(300, 42);
-    for(let i=0;i<12;i++){
-      ctx.rotate(Math.PI/6);
-      const rg = ctx.createLinearGradient(0, 0, 0, 160);
-      rg.addColorStop(0, "rgba(255,245,180,0.22)");
-      rg.addColorStop(0.5, "rgba(255,230,140,0.08)");
-      rg.addColorStop(1, "rgba(255,200,100,0)");
-      ctx.fillStyle = rg;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(-14, 160);
-      ctx.lineTo(14, 160);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.restore();
-
-    // แกนดวงอาทิตย์
-    const core = ctx.createRadialGradient(300, 42, 2, 300, 42, 32);
-    core.addColorStop(0, "#ffffff");
-    core.addColorStop(0.35, "#fff59d");
-    core.addColorStop(0.7, "#ffeb3b");
-    core.addColorStop(1, "rgba(255,160,0,0.15)");
-    ctx.fillStyle = core;
-    ctx.beginPath(); ctx.arc(300, 42, 32, 0, Math.PI*2); ctx.fill();
-    // ขอบแสง
-    ctx.strokeStyle = "rgba(255,255,200,0.35)";
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(300, 42, 28, 0, Math.PI*2); ctx.stroke();
-  } else {
-    // แสงจันทร์กระจาย
-    const moonG = ctx.createRadialGradient(300, 42, 3, 300, 42, 100);
-    moonG.addColorStop(0, "rgba(220,230,255,0.4)");
-    moonG.addColorStop(0.4, "rgba(160,180,255,0.12)");
-    moonG.addColorStop(1, "rgba(80,100,180,0)");
-    ctx.fillStyle = moonG;
-    ctx.fillRect(0, 0, canvas.width, 130);
-
-    // ลำแสงจันทร์จาง
-    ctx.save();
-    ctx.translate(300, 42);
-    for(let i=0;i<6;i++){
-      ctx.rotate(Math.PI/3);
-      ctx.fillStyle = "rgba(180,200,255,0.06)";
-      ctx.beginPath();
-      ctx.moveTo(0,0); ctx.lineTo(-10, 100); ctx.lineTo(10, 100);
-      ctx.closePath(); ctx.fill();
-    }
-    ctx.restore();
-
-    // ดวงจันทร์
-    const mc = ctx.createRadialGradient(296, 38, 2, 300, 42, 18);
-    mc.addColorStop(0, "#ffffff");
-    mc.addColorStop(0.6, "#e8eaf6");
-    mc.addColorStop(1, "#90a4ae");
-    ctx.fillStyle = mc;
-    ctx.beginPath(); ctx.arc(300, 42, 17, 0, Math.PI*2); ctx.fill();
-    // หลุม
-    ctx.fillStyle = "rgba(120,140,160,0.45)";
-    ctx.beginPath(); ctx.arc(306, 38, 3.5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(294, 46, 2.5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(302, 48, 2, 0, Math.PI*2); ctx.fill();
-
-    // ดาวระยิบ
-    for(let i=0;i<30;i++){
-      const sx = (i*47+13)%350 + 5;
-      const sy = (i*23+7)%85 + 5;
-      const tw = 0.4 + 0.6 * Math.abs(Math.sin(Date.now()/400 + i));
-      ctx.globalAlpha = tw;
-      ctx.fillStyle = i%5===0 ? "#ffe082" : "#fff";
-      const sz = i%4===0 ? 2.2 : 1;
-      ctx.beginPath(); ctx.arc(sx, sy, sz, 0, Math.PI*2); ctx.fill();
-      if(i%6===0){
-        ctx.strokeStyle = "rgba(255,255,255,0.5)";
-        ctx.lineWidth = 0.8;
-        ctx.beginPath(); ctx.moveTo(sx-4,sy); ctx.lineTo(sx+4,sy); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(sx,sy-4); ctx.lineTo(sx,sy+4); ctx.stroke();
-      }
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  // ฝน / ลม
-  if(currentWeather===1){
-    ctx.strokeStyle="rgba(200,220,255,0.55)"; ctx.lineWidth=1.5;
-    for(let i=0;i<50;i++){
-      const x=Math.random()*canvas.width, y=Math.random()*canvas.height;
-      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-3,y+12); ctx.stroke();
-    }
-  }
-  if(currentWeather===2){
-    ctx.strokeStyle="rgba(255,255,255,0.28)"; ctx.lineWidth=2;
-    for(let i=0;i<10;i++){
-      const y=50+i*32;
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.bezierCurveTo(90,y-10,200,y+10,360,y); ctx.stroke();
-    }
-  }
-  if(currentWeather===3){
-    // ออโรร่า แสงสีบนฟ้า
-    const at = Date.now()/1200;
-    for(let i=0;i<5;i++){
-      const g = ctx.createLinearGradient(0, 0, 0, 120);
-      const cols = [
-        ["rgba(0,255,180,0.2)","rgba(80,120,255,0.08)","rgba(0,0,0,0)"],
-        ["rgba(180,80,255,0.18)","rgba(0,200,255,0.08)","rgba(0,0,0,0)"],
-        ["rgba(255,80,180,0.15)","rgba(100,255,200,0.06)","rgba(0,0,0,0)"]
-      ][i%3];
-      g.addColorStop(0, cols[0]);
-      g.addColorStop(0.5, cols[1]);
-      g.addColorStop(1, cols[2]);
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.moveTo(-20+i*40, 0);
-      for(let x=0;x<=canvas.width+40;x+=20){
-        const y = 30 + Math.sin(x*0.02 + at + i)*18 + i*8;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(canvas.width+40, 0);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
-  // คลื่นน้ำหลายชั้น
-  for(let i=0;i<6;i++){
-    ctx.strokeStyle = `rgba(255,255,255,${0.12 + i*0.03})`;
-    ctx.lineWidth = 1.5 + (i%2);
-    ctx.beginPath();
-    ctx.moveTo(0, 80+i*45);
-    ctx.quadraticCurveTo(canvas.width/2, 70+i*45 + Math.sin(i)*6, canvas.width, 80+i*45);
-    ctx.stroke();
-  }
-
-  // ===== แสงเงาทั่วฉาก จัดเต็ม =====
-  // ชั้นน้ำลึก (เงา)
-  const depthG = ctx.createLinearGradient(0, 85, 0, canvas.height);
-  depthG.addColorStop(0, "rgba(0,0,0,0)");
-  depthG.addColorStop(0.25, isDay ? "rgba(0,30,50,0.06)" : "rgba(0,5,25,0.18)");
-  depthG.addColorStop(0.55, isDay ? "rgba(0,20,40,0.16)" : "rgba(0,0,15,0.32)");
-  depthG.addColorStop(1, isDay ? "rgba(0,5,20,0.38)" : "rgba(0,0,0,0.55)");
-  ctx.fillStyle = depthG;
-  ctx.fillRect(0, 85, canvas.width, canvas.height-85);
-
-  // แสงสะท้อนผิวน้ำกว้าง
-  const waterLight = ctx.createLinearGradient(0, 75, 0, 200);
-  if(isDay){
-    waterLight.addColorStop(0, "rgba(255,255,230,0.18)");
-    waterLight.addColorStop(0.4, "rgba(200,230,255,0.08)");
-    waterLight.addColorStop(1, "rgba(255,255,255,0)");
-  } else {
-    waterLight.addColorStop(0, "rgba(140,160,255,0.12)");
-    waterLight.addColorStop(0.5, "rgba(80,100,180,0.05)");
-    waterLight.addColorStop(1, "rgba(50,60,120,0)");
-  }
-  ctx.fillStyle = waterLight;
-  ctx.fillRect(0, 75, canvas.width, 130);
-
-  // ประกายน้ำ (caustics แบบง่าย)
-  const t = Date.now()/900;
-  ctx.strokeStyle = isDay ? "rgba(255,255,255,0.12)" : "rgba(150,180,255,0.1)";
-  ctx.lineWidth = 1.5;
-  for(let i=0;i<5;i++){
-    ctx.beginPath();
-    for(let x=0;x<=canvas.width;x+=12){
-      const y = 110 + i*28 + Math.sin(x*0.04 + t + i)*4 + Math.cos(x*0.02 - t*0.7)*3;
-      if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-  }
-
-  // แสงฟุ้งมุมบน (ตามทิศดวงอาทิตย์/จันทร์)
-  const corner = ctx.createRadialGradient(300, 20, 10, 200, 80, 280);
-  corner.addColorStop(0, isDay ? "rgba(255,240,180,0.15)" : "rgba(160,180,255,0.1)");
-  corner.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = corner;
-  ctx.fillRect(0, 0, canvas.width, 180);
-
-  // เงาด้านข้าง (volume)
-  const sideL = ctx.createLinearGradient(0, 0, 80, 0);
-  sideL.addColorStop(0, isDay ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.25)");
-  sideL.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = sideL;
-  ctx.fillRect(0, 0, 80, canvas.height);
-  const sideR = ctx.createLinearGradient(canvas.width, 0, canvas.width-80, 0);
-  sideR.addColorStop(0, isDay ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.25)");
-  sideR.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = sideR;
-  ctx.fillRect(canvas.width-80, 0, 80, canvas.height);
-
-  // vignette แรง
-  const vig = ctx.createRadialGradient(canvas.width/2, canvas.height*0.42, 40, canvas.width/2, canvas.height*0.45, canvas.width*0.72);
-  vig.addColorStop(0, "rgba(0,0,0,0)");
-  vig.addColorStop(0.55, "rgba(0,0,0,0)");
-  vig.addColorStop(1, isDay ? "rgba(0,0,0,0.22)" : "rgba(0,0,0,0.42)");
-  ctx.fillStyle = vig;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // หมอกเบาๆ ขอบฟ้า
-  const fog = ctx.createLinearGradient(0, 60, 0, 100);
-  fog.addColorStop(0, isDay ? "rgba(255,255,255,0.06)" : "rgba(40,50,80,0.12)");
-  fog.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = fog;
-  ctx.fillRect(0, 60, canvas.width, 50);
-
-  try{ rzBack(currentLoc); }catch(e){}
-  drawIslandBack(currentLoc);
-
-  // ===== ตกแต่งสถานที่แบบละเอียด =====  // ===== ตกแต่งสถานที่แบบละเอียด =====
-  if(currentLoc===0){ // ชายหาด - หาดทราย + ปู + นก
-    ctx.fillStyle="rgba(255,224,178,0.35)";
-    ctx.fillRect(0, 300, canvas.width, 60);
-    ctx.fillStyle="#ffe0b2";
-    ctx.beginPath(); ctx.ellipse(50, 310, 40, 12, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#ffcc80";
-    ctx.beginPath(); ctx.arc(30, 305, 4, 0, Math.PI*2); ctx.fill();
-    // นก
-    ctx.strokeStyle="rgba(255,255,255,0.7)"; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(250,40); ctx.quadraticCurveTo(260,35,270,40); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(280,50); ctx.quadraticCurveTo(288,46,296,50); ctx.stroke();
-  }
-  if(currentLoc===1){ // เกาะลึกลับ
-    ctx.fillStyle="#4e342e";
-    ctx.beginPath(); ctx.ellipse(55, 100, 50, 20, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#2e7d32";
-    ctx.beginPath(); ctx.arc(40, 78, 18, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(65, 72, 15, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(55, 65, 12, 0, Math.PI*2); ctx.fill();
-    // ปะการัง
-    ctx.fillStyle="#e91e63";
-    ctx.beginPath(); ctx.moveTo(300,280); ctx.lineTo(295,250); ctx.lineTo(305,250); ctx.fill();
-    ctx.fillStyle="#9c27b0";
-    ctx.beginPath(); ctx.moveTo(320,290); ctx.lineTo(318,260); ctx.lineTo(325,260); ctx.fill();
-  }
-  if(currentLoc===2){ // ทะเลลึก
-    ctx.fillStyle="rgba(0,0,0,0.3)";
-    ctx.beginPath(); ctx.ellipse(180, 220, 120, 50, 0, 0, Math.PI*2); ctx.fill();
-    // ปลาเล็กเรืองแสง
-    ctx.fillStyle="rgba(128,222,234,0.5)";
-    for(let i=0;i<6;i++){
-      ctx.beginPath(); ctx.arc(60+i*45, 150+Math.sin(i*2)*20, 3, 0, Math.PI*2); ctx.fill();
-    }
-  }
-  if(currentLoc===3){ // เกาะลับ
-    ctx.fillStyle="#6a1b9a";
-    ctx.beginPath(); ctx.ellipse(70, 95, 55, 22, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#ce93d8";
-    ctx.beginPath(); ctx.arc(50, 75, 16, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(85, 70, 13, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="rgba(206,147,216,0.35)";
-    ctx.beginPath(); ctx.arc(70, 80, 45, 0, Math.PI*2); ctx.fill();
-    // คริสตัล
-    ctx.fillStyle="#e1bee7";
-    ctx.beginPath(); ctx.moveTo(300,100); ctx.lineTo(295,70); ctx.lineTo(305,70); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(320,110); ctx.lineTo(315,75); ctx.lineTo(328,75); ctx.fill();
-  }
-  if(currentLoc===4){ // ซากใต้น้ำ
-    ctx.fillStyle="#5d4037";
-    ctx.beginPath(); ctx.ellipse(80, 105, 60, 24, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#bf360c";
-    ctx.beginPath(); ctx.arc(55, 88, 14, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(95, 85, 12, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="rgba(255,87,34,0.4)";
-    ctx.beginPath(); ctx.arc(75, 90, 40, 0, Math.PI*2); ctx.fill();
-    // เสาโบราณ
-    ctx.fillStyle="rgba(93,64,55,0.75)";
-    ctx.fillRect(275, 65, 14, 55);
-    ctx.fillRect(300, 50, 12, 70);
-    ctx.fillRect(320, 70, 10, 50);
-    // ประกายลาวา
-    ctx.fillStyle="#ffab40";
-    for(let i=0;i<5;i++){ ctx.beginPath(); ctx.arc(50+i*20, 70+Math.random()*30, 2, 0, Math.PI*2); ctx.fill(); }
-  }
-  if(currentLoc===5){ // บึงลึกลับ
-    ctx.fillStyle="#2e7d32";
-    ctx.beginPath(); ctx.arc(45, 72, 20, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(70, 65, 16, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(55, 58, 12, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#5d4037"; ctx.fillRect(52, 85, 10, 30);
-    // ใบบัวหลายใบ
-    ctx.fillStyle="#81c784";
-    ctx.beginPath(); ctx.ellipse(270, 125, 28, 12, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(310, 145, 22, 10, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(250, 160, 18, 8, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#f8bbd0";
-    ctx.beginPath(); ctx.arc(270, 122, 6, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#fff";
-    ctx.beginPath(); ctx.arc(270, 122, 3, 0, Math.PI*2); ctx.fill();
-  }
-  if(currentLoc===6){ // ทะเลน้ำแข็ง
-    ctx.fillStyle="#e1f5fe";
-    ctx.beginPath(); ctx.moveTo(30,115); ctx.lineTo(65,50); ctx.lineTo(100,115); ctx.closePath(); ctx.fill();
-    ctx.fillStyle="#b3e5fc";
-    ctx.beginPath(); ctx.moveTo(270,120); ctx.lineTo(305,45); ctx.lineTo(345,120); ctx.closePath(); ctx.fill();
-    ctx.fillStyle="#81d4fa";
-    ctx.beginPath(); ctx.moveTo(150,110); ctx.lineTo(175,70); ctx.lineTo(200,110); ctx.closePath(); ctx.fill();
-    // หิมะตก
-    ctx.fillStyle="rgba(255,255,255,0.7)";
-    for(let i=0;i<15;i++){
-      ctx.beginPath(); ctx.arc(Math.random()*360, Math.random()*200, 1.5+Math.random()*2, 0, Math.PI*2); ctx.fill();
-    }
-  }
-  if(currentLoc===7){ // มิติมืด
-    ctx.strokeStyle="rgba(186,104,200,0.55)"; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(70, 90, 35, 0, Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(70, 90, 24, 0, Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(70, 90, 14, 0, Math.PI*2); ctx.stroke();
-    ctx.fillStyle="#ce93d8";
-    ctx.beginPath(); ctx.arc(70, 90, 7, 0, Math.PI*2); ctx.fill();
-    // อนุภาคม่วง
-    ctx.fillStyle="#e1bee7";
-    for(let i=0;i<12;i++){
-      const a = i * 0.55;
-      ctx.globalAlpha = 0.4 + (i%3)*0.2;
-      ctx.beginPath();
-      ctx.arc(200+Math.sin(a)*90, 100+Math.cos(a)*40, 2+i%3, 0, Math.PI*2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  // เงาเรือ + สะท้อน จัดเต็ม
-  // เงานุ่มหลายชั้น
-  ctx.fillStyle = "rgba(0,0,0,0.12)";
-  ctx.beginPath(); ctx.ellipse(boatX+4, 62, 34, 9, 0, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath(); ctx.ellipse(boatX+2, 58, 26, 6, 0, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.beginPath(); ctx.ellipse(boatX+1, 56, 18, 3.5, 0, 0, Math.PI*2); ctx.fill();
-
-  // สะท้อนเรือในน้ำ
-  ctx.save();
-  ctx.globalAlpha = 0.22;
-  ctx.scale(1, 0.55);
-  ctx.translate(0, 58/0.55);
-  ctx.fillStyle = "#3e2723";
-  ctx.beginPath();
-  ctx.moveTo(boatX-26, 40);
-  ctx.lineTo(boatX+26, 40);
-  ctx.lineTo(boatX+16, 54);
-  ctx.lineTo(boatX-16, 54);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  // ระลอกใต้เรือ
-  ctx.strokeStyle = "rgba(255,255,255,0.2)";
-  ctx.lineWidth = 1;
-  for(let i=0;i<3;i++){
-    ctx.globalAlpha = 0.25 - i*0.06;
-    ctx.beginPath();
-    ctx.ellipse(boatX, 60+i*5, 20+i*8, 4+i, 0, 0, Math.PI*2);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-
-  // เรือ
-  ctx.fillStyle="#4e342e";
-  ctx.beginPath(); ctx.moveTo(boatX-28,40); ctx.lineTo(boatX+28,40); ctx.lineTo(boatX+18,54); ctx.lineTo(boatX-18,54); ctx.closePath(); ctx.fill();
-  // ไฮไลต์ขอบบน
-  ctx.strokeStyle="rgba(255,255,255,0.28)";
-  ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(boatX-24,41); ctx.lineTo(boatX+24,41); ctx.stroke();
-  // เงาด้านในเรือ
-  ctx.fillStyle="rgba(0,0,0,0.25)";
-  ctx.beginPath(); ctx.moveTo(boatX-18,44); ctx.lineTo(boatX+18,44); ctx.lineTo(boatX+12,52); ctx.lineTo(boatX-12,52); ctx.closePath(); ctx.fill();
-  ctx.fillStyle="#6d4c41";
-  ctx.beginPath(); ctx.moveTo(boatX-22,40); ctx.lineTo(boatX+22,40); ctx.lineTo(boatX+14,48); ctx.lineTo(boatX-14,48); ctx.closePath(); ctx.fill();
-  // เงาคนบนเรือ
-  ctx.fillStyle="rgba(0,0,0,0.2)";
-  ctx.beginPath(); ctx.ellipse(boatX+3, 38, 8, 3, 0, 0, Math.PI*2); ctx.fill();
-
-  // คน
-  ctx.fillStyle="#ffe0b2";
-  ctx.beginPath(); ctx.arc(boatX, 28, 9, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle="#5d4037";
-  ctx.beginPath(); ctx.arc(boatX, 26, 5, Math.PI, Math.PI*2); ctx.fill(); // ผม
-
-  // ===== เบ็ดสีสันตามชนิด =====
-  const rodColors = [
+var ROD_COLORS = [
     {rod:"#8d6e63", line:"#bcaaa4", hook:"#a1887f", glow:null},           // 0 ไม้
     {rod:"#78909c", line:"#b0bec5", hook:"#90a4ae", glow:null},           // 1 เหล็ก
     {rod:"#b0bec5", line:"#eceff1", hook:"#cfd8dc", glow:"#e0e0e0"},      // 2 เงิน
@@ -4314,527 +3842,14 @@ function draw(){
     {rod:"#90caf9", line:"#e3f2fd", hook:"#00e5ff", glow:"#40c4ff"},      // 47 Luminescent Oath
     {rod:"#ce93d8", line:"#e1bee7", hook:"#fff", glow:"#b388ff"}            // 48 Zenith
   ];
-  const rc = Object.assign({}, rodColors[currentRod] || rodColors[0]);
-  // เบ็ดวงล้อสุ่ม: สีวนไปเรื่อยๆ
-  if(currentRod===39){
-    const wheelCols = ["#e91e63","#ffeb3b","#00e676","#2979ff","#d500f9","#ff6d00","#00e5ff","#ff1744"];
-    const t = Math.floor(Date.now()/400) % wheelCols.length;
-    rc.rod = wheelCols[t];
-    rc.line = wheelCols[(t+2)%wheelCols.length];
-    rc.hook = wheelCols[(t+4)%wheelCols.length];
-    rc.glow = wheelCols[(t+1)%wheelCols.length];
-  }
-
-  // เรืองแสงรอบเบ็ด (เบ็ดระดับสูง)
-  if(rc.glow && !ROD_STYLE[currentRod]){
-    ctx.strokeStyle = rc.glow;
-    ctx.lineWidth = 8;
-    ctx.globalAlpha = 0.25;
-    ctx.beginPath(); ctx.moveTo(boatX+14,36); ctx.lineTo(boatX+14,10); ctx.stroke();
-    ctx.globalAlpha = 0.45;
-    ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(boatX+14,36); ctx.lineTo(boatX+14,10); ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
-
-
-  // ตกแต่งถ้ำน้ำวน
-  if(currentLoc===9){
-    const t = Date.now()/800;
-    // วงน้ำวน
-    for(let i=3;i>=1;i--){
-      ctx.strokeStyle = `rgba(77,208,225,${0.15+i*0.08})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(canvas.width*0.5, canvas.height*0.62, 18+i*16+Math.sin(t+i)*3, 0, Math.PI*2);
-      ctx.stroke();
-    }
-    // จุดเรืองแสง
-    for(let i=0;i<8;i++){
-      const a = t*0.7 + i*Math.PI/4;
-      const rx = canvas.width*0.5 + Math.cos(a)*(40+i*3);
-      const ry = canvas.height*0.62 + Math.sin(a)*(12+i);
-      ctx.fillStyle = `rgba(178,235,242,${0.35+0.25*Math.sin(t*2+i)})`;
-      ctx.beginPath(); ctx.arc(rx, ry, 2+i%2, 0, Math.PI*2); ctx.fill();
-    }
-    // หินถ้ำซ้าย-ขวา
-    ctx.fillStyle = "rgba(0,50,50,0.55)";
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height*0.35);
-    ctx.lineTo(40, canvas.height*0.5);
-    ctx.lineTo(25, canvas.height*0.7);
-    ctx.lineTo(0, canvas.height*0.75);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(canvas.width, canvas.height*0.32);
-    ctx.lineTo(canvas.width-45, canvas.height*0.48);
-    ctx.lineTo(canvas.width-20, canvas.height*0.72);
-    ctx.lineTo(canvas.width, canvas.height*0.78);
-    ctx.fill();
-    // ผลึกเรือง
-    ctx.fillStyle = "rgba(128,222,234,0.7)";
-    ctx.beginPath(); ctx.moveTo(18, canvas.height*0.42); ctx.lineTo(26, canvas.height*0.38); ctx.lineTo(24, canvas.height*0.48); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(canvas.width-22, canvas.height*0.4); ctx.lineTo(canvas.width-14, canvas.height*0.36); ctx.lineTo(canvas.width-16, canvas.height*0.46); ctx.fill();
-  }
-
-
-  // ตกแต่งแท่นเสริมพลัง
-  if(currentLoc===10){
-    const t = Date.now()/700;
-    const cx = canvas.width*0.5;
-    const cy = canvas.height*0.58;
-    // วงเวทหมุน
-    for(let i=0;i<3;i++){
-      ctx.strokeStyle = `rgba(179,157,219,${0.25+i*0.12})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 28+i*14, t*(0.5+i*0.2), t*(0.5+i*0.2)+Math.PI*1.4);
-      ctx.stroke();
-    }
-    // แท่นกลาง
-    ctx.fillStyle = "rgba(49,27,146,0.75)";
-    ctx.beginPath();
-    ctx.moveTo(cx-40, cy+20);
-    ctx.lineTo(cx-28, cy-8);
-    ctx.lineTo(cx+28, cy-8);
-    ctx.lineTo(cx+40, cy+20);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = "#b39ddb";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    // ลูกแก้วบนแท่น
-    const pulse = 0.5+0.3*Math.sin(t*2);
-    ctx.globalAlpha = pulse;
-    const g = ctx.createRadialGradient(cx, cy-18, 2, cx, cy-18, 16);
-    g.addColorStop(0, "#e1bee7");
-    g.addColorStop(0.5, "#7c4dff");
-    g.addColorStop(1, "rgba(49,27,146,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(cx, cy-18, 16, 0, Math.PI*2); ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "#b388ff";
-    ctx.beginPath(); ctx.arc(cx, cy-18, 7, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.globalAlpha = 0.8;
-    ctx.beginPath(); ctx.arc(cx-2, cy-20, 2, 0, Math.PI*2); ctx.fill();
-    ctx.globalAlpha = 1;
-    // เสาหินซ้าย-ขวา
-    ctx.fillStyle = "rgba(30,0,60,0.7)";
-    ctx.fillRect(18, canvas.height*0.28, 16, canvas.height*0.45);
-    ctx.fillRect(canvas.width-34, canvas.height*0.28, 16, canvas.height*0.45);
-    // รูนเรืองบนเสา
-    ctx.fillStyle = `rgba(206,147,216,${0.4+0.3*Math.sin(t*3)})`;
-    for(let y=0;y<4;y++){
-      ctx.fillRect(22, canvas.height*0.34+y*28, 8, 6);
-      ctx.fillRect(canvas.width-30, canvas.height*0.34+y*28, 8, 6);
-    }
-    // ดาวเวทลอย
-    for(let i=0;i<10;i++){
-      const a = t*0.4 + i*0.7;
-      const px = cx + Math.cos(a)* (50+i*4);
-      const py = cy - 30 + Math.sin(a*1.3)*20 - i*2;
-      ctx.fillStyle = `rgba(255,255,255,${0.3+0.4*Math.sin(t*2+i)})`;
-      ctx.beginPath(); ctx.arc(px, py, 1.5+(i%3)*0.5, 0, Math.PI*2); ctx.fill();
-    }
-    // พื้นเรือง
-    ctx.fillStyle = "rgba(124,77,255,0.15)";
-    ctx.beginPath();
-    ctx.ellipse(cx, cy+28, 70, 12, 0, 0, Math.PI*2);
-    ctx.fill();
-  }
-
-
-  // ตกแต่งเกาะลาวา จัดเต็ม + ภูเขาไฟ + เปลวไฟ + แสงเงา
-  if(currentLoc===11){
-    const t = Date.now()/500;
-    const W = canvas.width, H = canvas.height;
-
-    // แสงลาวาทั้งฉาก
-    const lavaGlow = ctx.createRadialGradient(90, 50, 10, 90, 80, 160);
-    lavaGlow.addColorStop(0, "rgba(255,120,0,0.35)");
-    lavaGlow.addColorStop(0.4, "rgba(255,60,0,0.12)");
-    lavaGlow.addColorStop(1, "rgba(80,0,0,0)");
-    ctx.fillStyle = lavaGlow;
-    ctx.fillRect(0, 0, W, 180);
-
-    // ภูเขาไฟหลัก (ใหญ่)
-    ctx.fillStyle = "#3e2723";
-    ctx.beginPath();
-    ctx.moveTo(15, 135);
-    ctx.lineTo(85, 28);
-    ctx.lineTo(155, 135);
-    ctx.closePath();
-    ctx.fill();
-    // เงาด้านข้างภูเขา
-    ctx.fillStyle = "rgba(0,0,0,0.28)";
-    ctx.beginPath();
-    ctx.moveTo(85, 28);
-    ctx.lineTo(155, 135);
-    ctx.lineTo(100, 135);
-    ctx.closePath();
-    ctx.fill();
-    // ไฮไลต์ขอบซ้าย
-    ctx.strokeStyle = "rgba(255,160,80,0.25)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(40, 110);
-    ctx.lineTo(85, 32);
-    ctx.stroke();
-
-    // ปากปล่อง + แสง
-    const craterG = ctx.createRadialGradient(85, 40, 2, 85, 42, 28);
-    craterG.addColorStop(0, "#fff59d");
-    craterG.addColorStop(0.3, "#ff6d00");
-    craterG.addColorStop(0.7, "#bf360c");
-    craterG.addColorStop(1, "rgba(80,20,0,0)");
-    ctx.fillStyle = craterG;
-    ctx.beginPath(); ctx.ellipse(85, 42, 26, 12, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#1a0000";
-    ctx.beginPath(); ctx.ellipse(85, 40, 14, 6, 0, 0, Math.PI*2); ctx.fill();
-
-    // เปลวไฟจากปล่อง (หลายชั้น)
-    for(let f=0; f<7; f++){
-      const fx = 85 + Math.sin(t*2+f)*6;
-      const fy = 28 - f*7 - Math.sin(t*3+f)*3;
-      const fw = 10 - f*0.8;
-      const alpha = 0.75 - f*0.08;
-      const grd = ctx.createRadialGradient(fx, fy, 1, fx, fy, fw);
-      grd.addColorStop(0, `rgba(255,255,200,${alpha})`);
-      grd.addColorStop(0.4, `rgba(255,${140+f*10},0,${alpha*0.9})`);
-      grd.addColorStop(1, `rgba(255,40,0,0)`);
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.moveTo(fx-fw, fy+fw);
-      ctx.quadraticCurveTo(fx-fw*0.3, fy-fw*0.5, fx, fy-fw*1.2);
-      ctx.quadraticCurveTo(fx+fw*0.3, fy-fw*0.5, fx+fw, fy+fw);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    // ลาวาไหลลงภูเขา
-    ctx.strokeStyle = "#ff3d00";
-    ctx.lineWidth = 6;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(85, 48);
-    ctx.quadraticCurveTo(100, 75, 78, 115);
-    ctx.quadraticCurveTo(70, 130, 75, 145);
-    ctx.stroke();
-    ctx.strokeStyle = "#ffab40";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(85, 48);
-    ctx.quadraticCurveTo(96, 78, 80, 118);
-    ctx.stroke();
-    // แสงลาวาไหล
-    ctx.strokeStyle = "rgba(255,235,59,0.45)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(84, 50);
-    ctx.quadraticCurveTo(94, 80, 79, 120);
-    ctx.stroke();
-
-    // ภูเขาไฟลูกเล็กด้านหลัง
-    ctx.fillStyle = "#4e342e";
-    ctx.beginPath();
-    ctx.moveTo(130, 110);
-    ctx.lineTo(160, 55);
-    ctx.lineTo(190, 110);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#e64a19";
-    ctx.beginPath(); ctx.ellipse(160, 58, 10, 5, 0, 0, Math.PI*2); ctx.fill();
-    // เปลวเล็ก
-    ctx.fillStyle = `rgba(255,160,0,${0.5+0.3*Math.sin(t*2)})`;
-    ctx.beginPath();
-    ctx.moveTo(160, 55);
-    ctx.lineTo(155, 42);
-    ctx.lineTo(165, 42);
-    ctx.closePath();
-    ctx.fill();
-
-    // หินลาวา / เกาะหิน
-    ctx.fillStyle = "#3e2723";
-    ctx.beginPath();
-    ctx.moveTo(W-5, 95);
-    ctx.lineTo(W-50, 60);
-    ctx.lineTo(W-95, 105);
-    ctx.lineTo(W-20, 140);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.beginPath();
-    ctx.moveTo(W-50, 60);
-    ctx.lineTo(W-95, 105);
-    ctx.lineTo(W-40, 120);
-    ctx.closePath();
-    ctx.fill();
-    // รอยลาวาบนหิน
-    ctx.strokeStyle = "#ff6d00";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(W-55, 70);
-    ctx.quadraticCurveTo(W-40, 95, W-30, 125);
-    ctx.stroke();
-
-    // เถ้าถ่าน / ประกายลอย
-    for(let i=0;i<16;i++){
-      const px = 50 + Math.sin(t*0.8+i*1.1)*40 + i*8;
-      const py = 20 + Math.cos(t*1.2+i)*15 + (i%5)*8;
-      const life = 0.4 + 0.6*Math.abs(Math.sin(t*2+i));
-      ctx.fillStyle = i%3===0
-        ? `rgba(255,200,50,${life})`
-        : `rgba(255,80,0,${life*0.85})`;
-      ctx.beginPath();
-      ctx.arc(px % (W-20), py, 1.5+(i%3), 0, Math.PI*2);
-      ctx.fill();
-    }
-
-    // แสงสะท้อนบนน้ำสีลาวา
-    const waterLava = ctx.createLinearGradient(0, 180, 0, H);
-    waterLava.addColorStop(0, "rgba(255,80,0,0.08)");
-    waterLava.addColorStop(0.4, "rgba(255,40,0,0.12)");
-    waterLava.addColorStop(1, "rgba(40,0,0,0.2)");
-    ctx.fillStyle = waterLava;
-    ctx.fillRect(0, 180, W, H-180);
-
-    // ระลอกแสงไฟบนน้ำ
-    ctx.strokeStyle = "rgba(255,150,50,0.15)";
-    ctx.lineWidth = 1.5;
-    for(let i=0;i<4;i++){
-      ctx.beginPath();
-      for(let x=0;x<=W;x+=10){
-        const y = 200 + i*25 + Math.sin(x*0.05 + t + i)*5;
-        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-      }
-      ctx.stroke();
-    }
-
-    // ควันจากปล่อง
-    for(let i=0;i<5;i++){
-      const sx = 85 + Math.sin(t*0.5+i)*12;
-      const sy = 10 - i*8;
-      ctx.fillStyle = `rgba(60,40,40,${0.15-i*0.02})`;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 12+i*4, 0, Math.PI*2);
-      ctx.fill();
-    }
-  }
-
-
-
-  // ตกแต่งเกาะโบราณ
-  if(currentLoc===8){
-    const t = Date.now()/700;
-    const W = canvas.width, H = canvas.height;
-
-    // แสงโบราณอุ่น
-    const ag = ctx.createRadialGradient(W*0.5, 40, 10, W*0.5, 60, 160);
-    ag.addColorStop(0, isDay ? "rgba(255,224,130,0.2)" : "rgba(255,160,50,0.12)");
-    ag.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = ag;
-    ctx.fillRect(0, 0, W, 140);
-
-    // พีระมิด / ซากวิหารซ้าย
-    ctx.fillStyle = "#5d4037";
-    ctx.beginPath();
-    ctx.moveTo(20, 130);
-    ctx.lineTo(70, 45);
-    ctx.lineTo(120, 130);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
-    ctx.beginPath();
-    ctx.moveTo(70, 45);
-    ctx.lineTo(120, 130);
-    ctx.lineTo(80, 130);
-    ctx.closePath();
-    ctx.fill();
-    // ขั้นบันได
-    ctx.strokeStyle = "rgba(215,204,200,0.35)";
-    ctx.lineWidth = 1.5;
-    for(let i=0;i<4;i++){
-      const y = 55 + i*18;
-      const w = 12 + i*10;
-      ctx.beginPath();
-      ctx.moveTo(70-w, y);
-      ctx.lineTo(70+w, y);
-      ctx.stroke();
-    }
-    // ประตูมืด
-    ctx.fillStyle = "#1a0a00";
-    ctx.fillRect(62, 95, 16, 28);
-
-    // เสาหินโบราณขวา
-    ctx.fillStyle = "#6d4c41";
-    ctx.fillRect(W-55, 50, 14, 85);
-    ctx.fillRect(W-30, 40, 12, 95);
-    ctx.fillStyle = "#8d6e63";
-    ctx.fillRect(W-58, 48, 20, 8);
-    ctx.fillRect(W-33, 38, 18, 8);
-    // รอยแตก
-    ctx.strokeStyle = "rgba(0,0,0,0.35)";
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(W-48, 60); ctx.lineTo(W-52, 100); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(W-24, 55); ctx.lineTo(W-20, 110); ctx.stroke();
-
-    // รูนเรืองแสงบนเสา
-    ctx.fillStyle = `rgba(255,193,7,${0.4+0.35*Math.sin(t*2)})`;
-    for(let i=0;i<3;i++){
-      ctx.fillRect(W-51, 65+i*22, 6, 5);
-      ctx.fillRect(W-26, 55+i*25, 5, 5);
-    }
-
-    // แท่นหินกลางน้ำ
-    ctx.fillStyle = "#4e342e";
-    ctx.beginPath();
-    ctx.ellipse(W*0.5, 145, 55, 14, 0, 0, Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle = "#6d4c41";
-    ctx.beginPath();
-    ctx.ellipse(W*0.5, 140, 40, 10, 0, 0, Math.PI*2);
-    ctx.fill();
-    // ไฟโบราณบนแท่น
-    const fx = W*0.5, fy = 128;
-    for(let i=0;i<5;i++){
-      const ox = Math.sin(t*3+i)*3;
-      const oy = -i*5 - Math.sin(t*2+i)*2;
-      const grd = ctx.createRadialGradient(fx+ox, fy+oy, 1, fx+ox, fy+oy, 8-i);
-      grd.addColorStop(0, `rgba(255,255,200,${0.8-i*0.12})`);
-      grd.addColorStop(0.5, `rgba(255,152,0,${0.5-i*0.08})`);
-      grd.addColorStop(1, "rgba(183,28,28,0)");
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.arc(fx+ox, fy+oy, 8-i, 0, Math.PI*2);
-      ctx.fill();
-    }
-
-    // เศษหินลอย / ฝุ่นโบราณ
-    for(let i=0;i<10;i++){
-      const px = 30 + (i*37)%(W-40);
-      const py = 40 + Math.sin(t+i)*20 + (i%4)*15;
-      ctx.fillStyle = `rgba(215,204,200,${0.25+0.3*Math.sin(t*1.5+i)})`;
-      ctx.beginPath();
-      ctx.arc(px, py, 1.5+(i%2), 0, Math.PI*2);
-      ctx.fill();
-    }
-
-    // สะท้อนน้ำสีน้ำตาลทอง
-    const wg = ctx.createLinearGradient(0, 160, 0, H);
-    wg.addColorStop(0, "rgba(141,110,99,0.12)");
-    wg.addColorStop(1, "rgba(62,39,35,0.2)");
-    ctx.fillStyle = wg;
-    ctx.fillRect(0, 160, W, H-160);
-  }
-
-  // ตกแต่งเกาะสายรุ้ง
-  if(currentLoc===12){
-    const t = Date.now()/800;
-    // สายรุ้งโค้ง
-    const bands = ["#ff1744","#ff9100","#ffea00","#00e676","#00b0ff","#2979ff","#d500f9"];
-    for(let i=0;i<7;i++){
-      ctx.strokeStyle = bands[i];
-      ctx.globalAlpha = 0.45;
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.arc(canvas.width*0.5, canvas.height*0.85, 120+i*7, Math.PI*1.15, Math.PI*1.85);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-    // เกาะคริสตัลสี
-    for(let i=0;i<6;i++){
-      const cx = 40+i*55, cy = 70+Math.sin(t+i)*6;
-      ctx.fillStyle = bands[i];
-      ctx.globalAlpha = 0.7;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy-12); ctx.lineTo(cx-6, cy+8); ctx.lineTo(cx+6, cy+8);
-      ctx.closePath(); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-    // ประกาย
-    for(let i=0;i<12;i++){
-      ctx.fillStyle = bands[i%7];
-      ctx.globalAlpha = 0.4+0.4*Math.sin(t*2+i);
-      ctx.beginPath();
-      ctx.arc(30+i*28, 40+Math.sin(t+i)*20, 2, 0, Math.PI*2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  // ตกแต่งหุบเขาออบซิเดียน
-  if(currentLoc===13){
-    const t = Date.now()/700;
-    // หน้าผาดำซ้าย-ขวา
-    ctx.fillStyle = "#1a1a1a";
-    ctx.beginPath();
-    ctx.moveTo(0, 40); ctx.lineTo(70, 30); ctx.lineTo(50, 160); ctx.lineTo(0, 180);
-    ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(canvas.width, 35); ctx.lineTo(canvas.width-75, 25); ctx.lineTo(canvas.width-45, 170); ctx.lineTo(canvas.width, 185);
-    ctx.closePath(); ctx.fill();
-    // เงา
-    ctx.fillStyle = "rgba(0,0,0,0.4)";
-    ctx.fillRect(0, 100, 40, 80);
-    // ผลึกออบซิเดียนเงา
-    for(let i=0;i<5;i++){
-      const x = 90+i*40;
-      ctx.fillStyle = i%2? "#263238" : "#37474f";
-      ctx.beginPath();
-      ctx.moveTo(x, 55); ctx.lineTo(x-10, 90); ctx.lineTo(x+10, 90);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "rgba(144,164,174,0.5)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-    // แสงม่วงจางในเงา
-    const g = ctx.createRadialGradient(canvas.width/2, 80, 10, canvas.width/2, 90, 100);
-    g.addColorStop(0, "rgba(100,50,150,0.15)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(50, 20, canvas.width-100, 120);
-    // เศษแก้วลอย
-    for(let i=0;i<8;i++){
-      ctx.fillStyle = `rgba(176,190,197,${0.3+0.4*Math.sin(t+i)})`;
-      ctx.beginPath();
-      ctx.arc(60+i*35, 100+Math.sin(t*1.5+i)*30, 2, 0, Math.PI*2);
-      ctx.fill();
-    }
-  }
-
-  // ตกแต่งทะเลเมฆ
-  if(currentLoc===14){
-    const t = Date.now()/1000;
-    // เมฆก้อนใหญ่
-    function cloud(x,y,s,a){
-      ctx.fillStyle = `rgba(255,255,255,${a})`;
-      ctx.beginPath(); ctx.arc(x, y, 16*s, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(x+18*s, y-6*s, 14*s, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(x+32*s, y+2*s, 12*s, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(x+12*s, y+8*s, 13*s, 0, Math.PI*2); ctx.fill();
-    }
-    cloud(40+Math.sin(t)*10, 45, 1.2, 0.85);
-    cloud(180+Math.cos(t*0.7)*15, 30, 1.0, 0.7);
-    cloud(280+Math.sin(t*0.5)*12, 55, 1.3, 0.8);
-    cloud(100, 70, 0.8, 0.55);
-    cloud(250, 80, 0.9, 0.5);
-    // แสงซึมผ่านเมฆ
-    const sg = ctx.createRadialGradient(200, 40, 5, 200, 60, 120);
-    sg.addColorStop(0, "rgba(255,255,255,0.25)");
-    sg.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, 0, canvas.width, 120);
-    // เกาะลอยเล็ก
-    ctx.fillStyle = "#a5d6a7";
-    ctx.beginPath(); ctx.ellipse(80, 110, 35, 12, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#66bb6a";
-    ctx.beginPath(); ctx.arc(70, 100, 10, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(90, 98, 8, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#81c784";
-    ctx.beginPath(); ctx.ellipse(280, 120, 28, 10, 0, 0, Math.PI*2); ctx.fill();
-  }
-
+function getRodColors(id){
+  var rc = Object.assign({}, ROD_COLORS[id] || ROD_COLORS[0]);
+  if(id===39){ var wc=["#e91e63","#ffeb3b","#00e676","#2979ff","#d500f9","#ff6d00","#00e5ff","#ff1744"], k=Math.floor(Date.now()/400)%wc.length;
+    rc.rod=wc[k]; rc.line=wc[(k+2)%wc.length]; rc.hook=wc[(k+4)%wc.length]; rc.glow=wc[(k+1)%wc.length]; }
+  return rc;
+}
+function drawRodSet(_rid, bx, hY, rc){
+  const boatX = bx, hookY = hY, currentRod = _rid;
   // ===== คันเบ็ดละเอียดตามชนิด =====
   const hx = boatX+14;
   const rodId = currentRod;
@@ -5541,6 +4556,1024 @@ function draw(){
   ctx.globalAlpha = 0.7;
   ctx.beginPath(); ctx.arc(boatX+14, hookY+6, 2.5, 0, Math.PI*2); ctx.fill();
   ctx.globalAlpha = 1;
+}
+function draw(){
+  const loc=locations[currentLoc];
+  const grad=ctx.createLinearGradient(0,0,0,canvas.height);
+
+  // สีต่างกันตามสถานที่ + กลางวัน/กลางคืน
+  if(currentLoc===0){ // ชายหาด
+    if(isDay){ grad.addColorStop(0,"#81d4fa"); grad.addColorStop(0.5,"#4fc3f7"); grad.addColorStop(1,"#0288d1"); }
+    else { grad.addColorStop(0,"#1a237e"); grad.addColorStop(1,"#0d47a1"); }
+  } else if(currentLoc===1){ // เกาะลึกลับ
+    if(isDay){ grad.addColorStop(0,"#80cbc4"); grad.addColorStop(0.4,"#26a69a"); grad.addColorStop(1,"#00695c"); }
+    else { grad.addColorStop(0,"#004d40"); grad.addColorStop(1,"#00251a"); }
+  } else if(currentLoc===2){ // ทะเลลึก
+    if(isDay){ grad.addColorStop(0,"#5c6bc0"); grad.addColorStop(0.5,"#303f9f"); grad.addColorStop(1,"#1a237e"); }
+    else { grad.addColorStop(0,"#0d1b2a"); grad.addColorStop(1,"#000814"); }
+  } else if(currentLoc===3){ // เกาะลับ
+    if(isDay){ grad.addColorStop(0,"#e1bee7"); grad.addColorStop(0.4,"#ce93d8"); grad.addColorStop(1,"#8e24aa"); }
+    else { grad.addColorStop(0,"#4a148c"); grad.addColorStop(1,"#1a0033"); }
+  } else if(currentLoc===4){ // ซากใต้น้ำ
+    if(isDay){ grad.addColorStop(0,"#ffab91"); grad.addColorStop(0.4,"#ff7043"); grad.addColorStop(1,"#d84315"); }
+    else { grad.addColorStop(0,"#bf360c"); grad.addColorStop(1,"#3e2723"); }
+  } else if(currentLoc===5){ // บึงลึกลับ
+    if(isDay){ grad.addColorStop(0,"#c5e1a5"); grad.addColorStop(0.4,"#9ccc65"); grad.addColorStop(1,"#558b2f"); }
+    else { grad.addColorStop(0,"#33691e"); grad.addColorStop(1,"#1b5e20"); }
+  } else if(currentLoc===6){ // ทะเลน้ำแข็ง
+    if(isDay){ grad.addColorStop(0,"#e1f5fe"); grad.addColorStop(0.4,"#81d4fa"); grad.addColorStop(1,"#0288d1"); }
+    else { grad.addColorStop(0,"#01579b"); grad.addColorStop(1,"#002f6c"); }
+  } else if(currentLoc===7){ // มิติมืด
+    if(isDay){ grad.addColorStop(0,"#7b1fa2"); grad.addColorStop(0.5,"#4a148c"); grad.addColorStop(1,"#1a0033"); }
+    else { grad.addColorStop(0,"#12001a"); grad.addColorStop(1,"#000000"); }
+  } else if(currentLoc===8){ // เกาะโบราณ
+    if(isDay){
+      grad.addColorStop(0,"#fff8e1");
+      grad.addColorStop(0.25,"#d7ccc8");
+      grad.addColorStop(0.55,"#a1887f");
+      grad.addColorStop(1,"#4e342e");
+    } else {
+      grad.addColorStop(0,"#5d4037");
+      grad.addColorStop(0.5,"#3e2723");
+      grad.addColorStop(1,"#1a0a00");
+    }
+  } else if(currentLoc===9){ // ถ้ำน้ำวน
+    if(isDay){ grad.addColorStop(0,"#e0f7fa"); grad.addColorStop(0.25,"#4dd0e1"); grad.addColorStop(0.55,"#00acc1"); grad.addColorStop(1,"#004d40"); }
+    else { grad.addColorStop(0,"#00695c"); grad.addColorStop(0.5,"#004d40"); grad.addColorStop(1,"#001a14"); }
+  } else if(currentLoc===10){ // แท่นเสริมพลัง
+    if(isDay){
+      grad.addColorStop(0,"#f3e5f5");
+      grad.addColorStop(0.25,"#ce93d8");
+      grad.addColorStop(0.55,"#7e57c2");
+      grad.addColorStop(1,"#1a0033");
+    } else {
+      grad.addColorStop(0,"#6a1b9a");
+      grad.addColorStop(0.4,"#4a148c");
+      grad.addColorStop(1,"#0d001a");
+    }
+  } else if(currentLoc===11){ // เกาะลาวา
+    if(isDay){
+      grad.addColorStop(0,"#ffe0b2");
+      grad.addColorStop(0.3,"#ff8a65");
+      grad.addColorStop(0.65,"#e64a19");
+      grad.addColorStop(1,"#bf360c");
+    } else {
+      grad.addColorStop(0,"#bf360c");
+      grad.addColorStop(0.5,"#6d1b00");
+      grad.addColorStop(1,"#1a0500");
+    }
+  } else if(currentLoc===12){ // เกาะสายรุ้ง
+    if(isDay){
+      grad.addColorStop(0,"#fce4ec");
+      grad.addColorStop(0.25,"#f8bbd0");
+      grad.addColorStop(0.5,"#ce93d8");
+      grad.addColorStop(0.75,"#90caf9");
+      grad.addColorStop(1,"#80cbc4");
+    } else {
+      grad.addColorStop(0,"#4a148c");
+      grad.addColorStop(0.5,"#1a237e");
+      grad.addColorStop(1,"#004d40");
+    }
+  } else if(currentLoc===13){ // ออบซิเดียน
+    if(isDay){
+      grad.addColorStop(0,"#78909c");
+      grad.addColorStop(0.4,"#455a64");
+      grad.addColorStop(1,"#212121");
+    } else {
+      grad.addColorStop(0,"#263238");
+      grad.addColorStop(1,"#000000");
+    }
+  } else if(currentLoc===14){ // ทะเลเมฆ
+    if(isDay){
+      grad.addColorStop(0,"#ffffff");
+      grad.addColorStop(0.35,"#e3f2fd");
+      grad.addColorStop(0.7,"#90caf9");
+      grad.addColorStop(1,"#64b5f6");
+    } else {
+      grad.addColorStop(0,"#37474f");
+      grad.addColorStop(0.5,"#1a237e");
+      grad.addColorStop(1,"#0d47a1");
+    }
+  } else {
+    if(isDay){ grad.addColorStop(0,"#81d4fa"); grad.addColorStop(1,"#0288d1"); }
+    else { grad.addColorStop(0,"#1a237e"); grad.addColorStop(1,"#0d47a1"); }
+  }
+  ctx.fillStyle=grad;ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // ดวงอาทิตย์ / ดวงจันทร์ จัดเต็ม
+  if(isDay){
+    // ท้องฟ้าเรืองจากดวงอาทิตย์
+    const skyGlow = ctx.createRadialGradient(300, 30, 5, 300, 50, 220);
+    skyGlow.addColorStop(0, "rgba(255,250,200,0.45)");
+    skyGlow.addColorStop(0.3, "rgba(255,220,120,0.2)");
+    skyGlow.addColorStop(0.65, "rgba(255,180,80,0.06)");
+    skyGlow.addColorStop(1, "rgba(255,150,50,0)");
+    ctx.fillStyle = skyGlow;
+    ctx.fillRect(0, 0, canvas.width, 120);
+
+    // God rays
+    ctx.save();
+    ctx.translate(300, 42);
+    for(let i=0;i<12;i++){
+      ctx.rotate(Math.PI/6);
+      const rg = ctx.createLinearGradient(0, 0, 0, 160);
+      rg.addColorStop(0, "rgba(255,245,180,0.22)");
+      rg.addColorStop(0.5, "rgba(255,230,140,0.08)");
+      rg.addColorStop(1, "rgba(255,200,100,0)");
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-14, 160);
+      ctx.lineTo(14, 160);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // แกนดวงอาทิตย์
+    const core = ctx.createRadialGradient(300, 42, 2, 300, 42, 32);
+    core.addColorStop(0, "#ffffff");
+    core.addColorStop(0.35, "#fff59d");
+    core.addColorStop(0.7, "#ffeb3b");
+    core.addColorStop(1, "rgba(255,160,0,0.15)");
+    ctx.fillStyle = core;
+    ctx.beginPath(); ctx.arc(300, 42, 32, 0, Math.PI*2); ctx.fill();
+    // ขอบแสง
+    ctx.strokeStyle = "rgba(255,255,200,0.35)";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(300, 42, 28, 0, Math.PI*2); ctx.stroke();
+  } else {
+    // แสงจันทร์กระจาย
+    const moonG = ctx.createRadialGradient(300, 42, 3, 300, 42, 100);
+    moonG.addColorStop(0, "rgba(220,230,255,0.4)");
+    moonG.addColorStop(0.4, "rgba(160,180,255,0.12)");
+    moonG.addColorStop(1, "rgba(80,100,180,0)");
+    ctx.fillStyle = moonG;
+    ctx.fillRect(0, 0, canvas.width, 130);
+
+    // ลำแสงจันทร์จาง
+    ctx.save();
+    ctx.translate(300, 42);
+    for(let i=0;i<6;i++){
+      ctx.rotate(Math.PI/3);
+      ctx.fillStyle = "rgba(180,200,255,0.06)";
+      ctx.beginPath();
+      ctx.moveTo(0,0); ctx.lineTo(-10, 100); ctx.lineTo(10, 100);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+
+    // ดวงจันทร์
+    const mc = ctx.createRadialGradient(296, 38, 2, 300, 42, 18);
+    mc.addColorStop(0, "#ffffff");
+    mc.addColorStop(0.6, "#e8eaf6");
+    mc.addColorStop(1, "#90a4ae");
+    ctx.fillStyle = mc;
+    ctx.beginPath(); ctx.arc(300, 42, 17, 0, Math.PI*2); ctx.fill();
+    // หลุม
+    ctx.fillStyle = "rgba(120,140,160,0.45)";
+    ctx.beginPath(); ctx.arc(306, 38, 3.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(294, 46, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(302, 48, 2, 0, Math.PI*2); ctx.fill();
+
+    // ดาวระยิบ
+    for(let i=0;i<30;i++){
+      const sx = (i*47+13)%350 + 5;
+      const sy = (i*23+7)%85 + 5;
+      const tw = 0.4 + 0.6 * Math.abs(Math.sin(Date.now()/400 + i));
+      ctx.globalAlpha = tw;
+      ctx.fillStyle = i%5===0 ? "#ffe082" : "#fff";
+      const sz = i%4===0 ? 2.2 : 1;
+      ctx.beginPath(); ctx.arc(sx, sy, sz, 0, Math.PI*2); ctx.fill();
+      if(i%6===0){
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(sx-4,sy); ctx.lineTo(sx+4,sy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sx,sy-4); ctx.lineTo(sx,sy+4); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ฝน / ลม
+  if(currentWeather===1){
+    ctx.strokeStyle="rgba(200,220,255,0.55)"; ctx.lineWidth=1.5;
+    for(let i=0;i<50;i++){
+      const x=Math.random()*canvas.width, y=Math.random()*canvas.height;
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-3,y+12); ctx.stroke();
+    }
+  }
+  if(currentWeather===2){
+    ctx.strokeStyle="rgba(255,255,255,0.28)"; ctx.lineWidth=2;
+    for(let i=0;i<10;i++){
+      const y=50+i*32;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.bezierCurveTo(90,y-10,200,y+10,360,y); ctx.stroke();
+    }
+  }
+  if(currentWeather===3){
+    // ออโรร่า แสงสีบนฟ้า
+    const at = Date.now()/1200;
+    for(let i=0;i<5;i++){
+      const g = ctx.createLinearGradient(0, 0, 0, 120);
+      const cols = [
+        ["rgba(0,255,180,0.2)","rgba(80,120,255,0.08)","rgba(0,0,0,0)"],
+        ["rgba(180,80,255,0.18)","rgba(0,200,255,0.08)","rgba(0,0,0,0)"],
+        ["rgba(255,80,180,0.15)","rgba(100,255,200,0.06)","rgba(0,0,0,0)"]
+      ][i%3];
+      g.addColorStop(0, cols[0]);
+      g.addColorStop(0.5, cols[1]);
+      g.addColorStop(1, cols[2]);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(-20+i*40, 0);
+      for(let x=0;x<=canvas.width+40;x+=20){
+        const y = 30 + Math.sin(x*0.02 + at + i)*18 + i*8;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(canvas.width+40, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // คลื่นน้ำหลายชั้น
+  for(let i=0;i<6;i++){
+    ctx.strokeStyle = `rgba(255,255,255,${0.12 + i*0.03})`;
+    ctx.lineWidth = 1.5 + (i%2);
+    ctx.beginPath();
+    ctx.moveTo(0, 80+i*45);
+    ctx.quadraticCurveTo(canvas.width/2, 70+i*45 + Math.sin(i)*6, canvas.width, 80+i*45);
+    ctx.stroke();
+  }
+
+  // ===== แสงเงาทั่วฉาก จัดเต็ม =====
+  // ชั้นน้ำลึก (เงา)
+  const depthG = ctx.createLinearGradient(0, 85, 0, canvas.height);
+  depthG.addColorStop(0, "rgba(0,0,0,0)");
+  depthG.addColorStop(0.25, isDay ? "rgba(0,30,50,0.06)" : "rgba(0,5,25,0.18)");
+  depthG.addColorStop(0.55, isDay ? "rgba(0,20,40,0.16)" : "rgba(0,0,15,0.32)");
+  depthG.addColorStop(1, isDay ? "rgba(0,5,20,0.38)" : "rgba(0,0,0,0.55)");
+  ctx.fillStyle = depthG;
+  ctx.fillRect(0, 85, canvas.width, canvas.height-85);
+
+  // แสงสะท้อนผิวน้ำกว้าง
+  const waterLight = ctx.createLinearGradient(0, 75, 0, 200);
+  if(isDay){
+    waterLight.addColorStop(0, "rgba(255,255,230,0.18)");
+    waterLight.addColorStop(0.4, "rgba(200,230,255,0.08)");
+    waterLight.addColorStop(1, "rgba(255,255,255,0)");
+  } else {
+    waterLight.addColorStop(0, "rgba(140,160,255,0.12)");
+    waterLight.addColorStop(0.5, "rgba(80,100,180,0.05)");
+    waterLight.addColorStop(1, "rgba(50,60,120,0)");
+  }
+  ctx.fillStyle = waterLight;
+  ctx.fillRect(0, 75, canvas.width, 130);
+
+  // ประกายน้ำ (caustics แบบง่าย)
+  const t = Date.now()/900;
+  ctx.strokeStyle = isDay ? "rgba(255,255,255,0.12)" : "rgba(150,180,255,0.1)";
+  ctx.lineWidth = 1.5;
+  for(let i=0;i<5;i++){
+    ctx.beginPath();
+    for(let x=0;x<=canvas.width;x+=12){
+      const y = 110 + i*28 + Math.sin(x*0.04 + t + i)*4 + Math.cos(x*0.02 - t*0.7)*3;
+      if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  // แสงฟุ้งมุมบน (ตามทิศดวงอาทิตย์/จันทร์)
+  const corner = ctx.createRadialGradient(300, 20, 10, 200, 80, 280);
+  corner.addColorStop(0, isDay ? "rgba(255,240,180,0.15)" : "rgba(160,180,255,0.1)");
+  corner.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = corner;
+  ctx.fillRect(0, 0, canvas.width, 180);
+
+  // เงาด้านข้าง (volume)
+  const sideL = ctx.createLinearGradient(0, 0, 80, 0);
+  sideL.addColorStop(0, isDay ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.25)");
+  sideL.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = sideL;
+  ctx.fillRect(0, 0, 80, canvas.height);
+  const sideR = ctx.createLinearGradient(canvas.width, 0, canvas.width-80, 0);
+  sideR.addColorStop(0, isDay ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.25)");
+  sideR.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = sideR;
+  ctx.fillRect(canvas.width-80, 0, 80, canvas.height);
+
+  // vignette แรง
+  const vig = ctx.createRadialGradient(canvas.width/2, canvas.height*0.42, 40, canvas.width/2, canvas.height*0.45, canvas.width*0.72);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(0.55, "rgba(0,0,0,0)");
+  vig.addColorStop(1, isDay ? "rgba(0,0,0,0.22)" : "rgba(0,0,0,0.42)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // หมอกเบาๆ ขอบฟ้า
+  const fog = ctx.createLinearGradient(0, 60, 0, 100);
+  fog.addColorStop(0, isDay ? "rgba(255,255,255,0.06)" : "rgba(40,50,80,0.12)");
+  fog.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, 60, canvas.width, 50);
+
+  try{ rzBack(currentLoc); }catch(e){}
+  drawIslandBack(currentLoc);
+
+  // ===== ตกแต่งสถานที่แบบละเอียด =====  // ===== ตกแต่งสถานที่แบบละเอียด =====
+  if(currentLoc===0){ // ชายหาด - หาดทราย + ปู + นก
+    ctx.fillStyle="rgba(255,224,178,0.35)";
+    ctx.fillRect(0, 300, canvas.width, 60);
+    ctx.fillStyle="#ffe0b2";
+    ctx.beginPath(); ctx.ellipse(50, 310, 40, 12, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#ffcc80";
+    ctx.beginPath(); ctx.arc(30, 305, 4, 0, Math.PI*2); ctx.fill();
+    // นก
+    ctx.strokeStyle="rgba(255,255,255,0.7)"; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(250,40); ctx.quadraticCurveTo(260,35,270,40); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(280,50); ctx.quadraticCurveTo(288,46,296,50); ctx.stroke();
+  }
+  if(currentLoc===1){ // เกาะลึกลับ
+    ctx.fillStyle="#4e342e";
+    ctx.beginPath(); ctx.ellipse(55, 100, 50, 20, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#2e7d32";
+    ctx.beginPath(); ctx.arc(40, 78, 18, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(65, 72, 15, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(55, 65, 12, 0, Math.PI*2); ctx.fill();
+    // ปะการัง
+    ctx.fillStyle="#e91e63";
+    ctx.beginPath(); ctx.moveTo(300,280); ctx.lineTo(295,250); ctx.lineTo(305,250); ctx.fill();
+    ctx.fillStyle="#9c27b0";
+    ctx.beginPath(); ctx.moveTo(320,290); ctx.lineTo(318,260); ctx.lineTo(325,260); ctx.fill();
+  }
+  if(currentLoc===2){ // ทะเลลึก
+    ctx.fillStyle="rgba(0,0,0,0.3)";
+    ctx.beginPath(); ctx.ellipse(180, 220, 120, 50, 0, 0, Math.PI*2); ctx.fill();
+    // ปลาเล็กเรืองแสง
+    ctx.fillStyle="rgba(128,222,234,0.5)";
+    for(let i=0;i<6;i++){
+      ctx.beginPath(); ctx.arc(60+i*45, 150+Math.sin(i*2)*20, 3, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  if(currentLoc===3){ // เกาะลับ
+    ctx.fillStyle="#6a1b9a";
+    ctx.beginPath(); ctx.ellipse(70, 95, 55, 22, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#ce93d8";
+    ctx.beginPath(); ctx.arc(50, 75, 16, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(85, 70, 13, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="rgba(206,147,216,0.35)";
+    ctx.beginPath(); ctx.arc(70, 80, 45, 0, Math.PI*2); ctx.fill();
+    // คริสตัล
+    ctx.fillStyle="#e1bee7";
+    ctx.beginPath(); ctx.moveTo(300,100); ctx.lineTo(295,70); ctx.lineTo(305,70); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(320,110); ctx.lineTo(315,75); ctx.lineTo(328,75); ctx.fill();
+  }
+  if(currentLoc===4){ // ซากใต้น้ำ
+    ctx.fillStyle="#5d4037";
+    ctx.beginPath(); ctx.ellipse(80, 105, 60, 24, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#bf360c";
+    ctx.beginPath(); ctx.arc(55, 88, 14, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(95, 85, 12, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="rgba(255,87,34,0.4)";
+    ctx.beginPath(); ctx.arc(75, 90, 40, 0, Math.PI*2); ctx.fill();
+    // เสาโบราณ
+    ctx.fillStyle="rgba(93,64,55,0.75)";
+    ctx.fillRect(275, 65, 14, 55);
+    ctx.fillRect(300, 50, 12, 70);
+    ctx.fillRect(320, 70, 10, 50);
+    // ประกายลาวา
+    ctx.fillStyle="#ffab40";
+    for(let i=0;i<5;i++){ ctx.beginPath(); ctx.arc(50+i*20, 70+Math.random()*30, 2, 0, Math.PI*2); ctx.fill(); }
+  }
+  if(currentLoc===5){ // บึงลึกลับ
+    ctx.fillStyle="#2e7d32";
+    ctx.beginPath(); ctx.arc(45, 72, 20, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(70, 65, 16, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(55, 58, 12, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#5d4037"; ctx.fillRect(52, 85, 10, 30);
+    // ใบบัวหลายใบ
+    ctx.fillStyle="#81c784";
+    ctx.beginPath(); ctx.ellipse(270, 125, 28, 12, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(310, 145, 22, 10, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(250, 160, 18, 8, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#f8bbd0";
+    ctx.beginPath(); ctx.arc(270, 122, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#fff";
+    ctx.beginPath(); ctx.arc(270, 122, 3, 0, Math.PI*2); ctx.fill();
+  }
+  if(currentLoc===6){ // ทะเลน้ำแข็ง
+    ctx.fillStyle="#e1f5fe";
+    ctx.beginPath(); ctx.moveTo(30,115); ctx.lineTo(65,50); ctx.lineTo(100,115); ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#b3e5fc";
+    ctx.beginPath(); ctx.moveTo(270,120); ctx.lineTo(305,45); ctx.lineTo(345,120); ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#81d4fa";
+    ctx.beginPath(); ctx.moveTo(150,110); ctx.lineTo(175,70); ctx.lineTo(200,110); ctx.closePath(); ctx.fill();
+    // หิมะตก
+    ctx.fillStyle="rgba(255,255,255,0.7)";
+    for(let i=0;i<15;i++){
+      ctx.beginPath(); ctx.arc(Math.random()*360, Math.random()*200, 1.5+Math.random()*2, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  if(currentLoc===7){ // มิติมืด
+    ctx.strokeStyle="rgba(186,104,200,0.55)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(70, 90, 35, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(70, 90, 24, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(70, 90, 14, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle="#ce93d8";
+    ctx.beginPath(); ctx.arc(70, 90, 7, 0, Math.PI*2); ctx.fill();
+    // อนุภาคม่วง
+    ctx.fillStyle="#e1bee7";
+    for(let i=0;i<12;i++){
+      const a = i * 0.55;
+      ctx.globalAlpha = 0.4 + (i%3)*0.2;
+      ctx.beginPath();
+      ctx.arc(200+Math.sin(a)*90, 100+Math.cos(a)*40, 2+i%3, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // เงาเรือ + สะท้อน จัดเต็ม
+  // เงานุ่มหลายชั้น
+  ctx.fillStyle = "rgba(0,0,0,0.12)";
+  ctx.beginPath(); ctx.ellipse(boatX+4, 62, 34, 9, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath(); ctx.ellipse(boatX+2, 58, 26, 6, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(boatX+1, 56, 18, 3.5, 0, 0, Math.PI*2); ctx.fill();
+
+  // สะท้อนเรือในน้ำ
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.scale(1, 0.55);
+  ctx.translate(0, 58/0.55);
+  ctx.fillStyle = "#3e2723";
+  ctx.beginPath();
+  ctx.moveTo(boatX-26, 40);
+  ctx.lineTo(boatX+26, 40);
+  ctx.lineTo(boatX+16, 54);
+  ctx.lineTo(boatX-16, 54);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // ระลอกใต้เรือ
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  ctx.lineWidth = 1;
+  for(let i=0;i<3;i++){
+    ctx.globalAlpha = 0.25 - i*0.06;
+    ctx.beginPath();
+    ctx.ellipse(boatX, 60+i*5, 20+i*8, 4+i, 0, 0, Math.PI*2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // เรือ
+  ctx.fillStyle="#4e342e";
+  ctx.beginPath(); ctx.moveTo(boatX-28,40); ctx.lineTo(boatX+28,40); ctx.lineTo(boatX+18,54); ctx.lineTo(boatX-18,54); ctx.closePath(); ctx.fill();
+  // ไฮไลต์ขอบบน
+  ctx.strokeStyle="rgba(255,255,255,0.28)";
+  ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(boatX-24,41); ctx.lineTo(boatX+24,41); ctx.stroke();
+  // เงาด้านในเรือ
+  ctx.fillStyle="rgba(0,0,0,0.25)";
+  ctx.beginPath(); ctx.moveTo(boatX-18,44); ctx.lineTo(boatX+18,44); ctx.lineTo(boatX+12,52); ctx.lineTo(boatX-12,52); ctx.closePath(); ctx.fill();
+  ctx.fillStyle="#6d4c41";
+  ctx.beginPath(); ctx.moveTo(boatX-22,40); ctx.lineTo(boatX+22,40); ctx.lineTo(boatX+14,48); ctx.lineTo(boatX-14,48); ctx.closePath(); ctx.fill();
+  // เงาคนบนเรือ
+  ctx.fillStyle="rgba(0,0,0,0.2)";
+  ctx.beginPath(); ctx.ellipse(boatX+3, 38, 8, 3, 0, 0, Math.PI*2); ctx.fill();
+
+  // คน
+  ctx.fillStyle="#ffe0b2";
+  ctx.beginPath(); ctx.arc(boatX, 28, 9, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle="#5d4037";
+  ctx.beginPath(); ctx.arc(boatX, 26, 5, Math.PI, Math.PI*2); ctx.fill(); // ผม
+
+  // ===== เบ็ดสีสันตามชนิด =====
+  const rodColors = ROD_COLORS;
+  const rc = Object.assign({}, rodColors[currentRod] || rodColors[0]);
+  // เบ็ดวงล้อสุ่ม: สีวนไปเรื่อยๆ
+  if(currentRod===39){
+    const wheelCols = ["#e91e63","#ffeb3b","#00e676","#2979ff","#d500f9","#ff6d00","#00e5ff","#ff1744"];
+    const t = Math.floor(Date.now()/400) % wheelCols.length;
+    rc.rod = wheelCols[t];
+    rc.line = wheelCols[(t+2)%wheelCols.length];
+    rc.hook = wheelCols[(t+4)%wheelCols.length];
+    rc.glow = wheelCols[(t+1)%wheelCols.length];
+  }
+
+  // เรืองแสงรอบเบ็ด (เบ็ดระดับสูง)
+  if(rc.glow && !ROD_STYLE[currentRod]){
+    ctx.strokeStyle = rc.glow;
+    ctx.lineWidth = 8;
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath(); ctx.moveTo(boatX+14,36); ctx.lineTo(boatX+14,10); ctx.stroke();
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(boatX+14,36); ctx.lineTo(boatX+14,10); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+
+  // ตกแต่งถ้ำน้ำวน
+  if(currentLoc===9){
+    const t = Date.now()/800;
+    // วงน้ำวน
+    for(let i=3;i>=1;i--){
+      ctx.strokeStyle = `rgba(77,208,225,${0.15+i*0.08})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(canvas.width*0.5, canvas.height*0.62, 18+i*16+Math.sin(t+i)*3, 0, Math.PI*2);
+      ctx.stroke();
+    }
+    // จุดเรืองแสง
+    for(let i=0;i<8;i++){
+      const a = t*0.7 + i*Math.PI/4;
+      const rx = canvas.width*0.5 + Math.cos(a)*(40+i*3);
+      const ry = canvas.height*0.62 + Math.sin(a)*(12+i);
+      ctx.fillStyle = `rgba(178,235,242,${0.35+0.25*Math.sin(t*2+i)})`;
+      ctx.beginPath(); ctx.arc(rx, ry, 2+i%2, 0, Math.PI*2); ctx.fill();
+    }
+    // หินถ้ำซ้าย-ขวา
+    ctx.fillStyle = "rgba(0,50,50,0.55)";
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height*0.35);
+    ctx.lineTo(40, canvas.height*0.5);
+    ctx.lineTo(25, canvas.height*0.7);
+    ctx.lineTo(0, canvas.height*0.75);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(canvas.width, canvas.height*0.32);
+    ctx.lineTo(canvas.width-45, canvas.height*0.48);
+    ctx.lineTo(canvas.width-20, canvas.height*0.72);
+    ctx.lineTo(canvas.width, canvas.height*0.78);
+    ctx.fill();
+    // ผลึกเรือง
+    ctx.fillStyle = "rgba(128,222,234,0.7)";
+    ctx.beginPath(); ctx.moveTo(18, canvas.height*0.42); ctx.lineTo(26, canvas.height*0.38); ctx.lineTo(24, canvas.height*0.48); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(canvas.width-22, canvas.height*0.4); ctx.lineTo(canvas.width-14, canvas.height*0.36); ctx.lineTo(canvas.width-16, canvas.height*0.46); ctx.fill();
+  }
+
+
+  // ตกแต่งแท่นเสริมพลัง
+  if(currentLoc===10){
+    const t = Date.now()/700;
+    const cx = canvas.width*0.5;
+    const cy = canvas.height*0.58;
+    // วงเวทหมุน
+    for(let i=0;i<3;i++){
+      ctx.strokeStyle = `rgba(179,157,219,${0.25+i*0.12})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 28+i*14, t*(0.5+i*0.2), t*(0.5+i*0.2)+Math.PI*1.4);
+      ctx.stroke();
+    }
+    // แท่นกลาง
+    ctx.fillStyle = "rgba(49,27,146,0.75)";
+    ctx.beginPath();
+    ctx.moveTo(cx-40, cy+20);
+    ctx.lineTo(cx-28, cy-8);
+    ctx.lineTo(cx+28, cy-8);
+    ctx.lineTo(cx+40, cy+20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#b39ddb";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // ลูกแก้วบนแท่น
+    const pulse = 0.5+0.3*Math.sin(t*2);
+    ctx.globalAlpha = pulse;
+    const g = ctx.createRadialGradient(cx, cy-18, 2, cx, cy-18, 16);
+    g.addColorStop(0, "#e1bee7");
+    g.addColorStop(0.5, "#7c4dff");
+    g.addColorStop(1, "rgba(49,27,146,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy-18, 16, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#b388ff";
+    ctx.beginPath(); ctx.arc(cx, cy-18, 7, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.arc(cx-2, cy-20, 2, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    // เสาหินซ้าย-ขวา
+    ctx.fillStyle = "rgba(30,0,60,0.7)";
+    ctx.fillRect(18, canvas.height*0.28, 16, canvas.height*0.45);
+    ctx.fillRect(canvas.width-34, canvas.height*0.28, 16, canvas.height*0.45);
+    // รูนเรืองบนเสา
+    ctx.fillStyle = `rgba(206,147,216,${0.4+0.3*Math.sin(t*3)})`;
+    for(let y=0;y<4;y++){
+      ctx.fillRect(22, canvas.height*0.34+y*28, 8, 6);
+      ctx.fillRect(canvas.width-30, canvas.height*0.34+y*28, 8, 6);
+    }
+    // ดาวเวทลอย
+    for(let i=0;i<10;i++){
+      const a = t*0.4 + i*0.7;
+      const px = cx + Math.cos(a)* (50+i*4);
+      const py = cy - 30 + Math.sin(a*1.3)*20 - i*2;
+      ctx.fillStyle = `rgba(255,255,255,${0.3+0.4*Math.sin(t*2+i)})`;
+      ctx.beginPath(); ctx.arc(px, py, 1.5+(i%3)*0.5, 0, Math.PI*2); ctx.fill();
+    }
+    // พื้นเรือง
+    ctx.fillStyle = "rgba(124,77,255,0.15)";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy+28, 70, 12, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+
+  // ตกแต่งเกาะลาวา จัดเต็ม + ภูเขาไฟ + เปลวไฟ + แสงเงา
+  if(currentLoc===11){
+    const t = Date.now()/500;
+    const W = canvas.width, H = canvas.height;
+
+    // แสงลาวาทั้งฉาก
+    const lavaGlow = ctx.createRadialGradient(90, 50, 10, 90, 80, 160);
+    lavaGlow.addColorStop(0, "rgba(255,120,0,0.35)");
+    lavaGlow.addColorStop(0.4, "rgba(255,60,0,0.12)");
+    lavaGlow.addColorStop(1, "rgba(80,0,0,0)");
+    ctx.fillStyle = lavaGlow;
+    ctx.fillRect(0, 0, W, 180);
+
+    // ภูเขาไฟหลัก (ใหญ่)
+    ctx.fillStyle = "#3e2723";
+    ctx.beginPath();
+    ctx.moveTo(15, 135);
+    ctx.lineTo(85, 28);
+    ctx.lineTo(155, 135);
+    ctx.closePath();
+    ctx.fill();
+    // เงาด้านข้างภูเขา
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.beginPath();
+    ctx.moveTo(85, 28);
+    ctx.lineTo(155, 135);
+    ctx.lineTo(100, 135);
+    ctx.closePath();
+    ctx.fill();
+    // ไฮไลต์ขอบซ้าย
+    ctx.strokeStyle = "rgba(255,160,80,0.25)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(40, 110);
+    ctx.lineTo(85, 32);
+    ctx.stroke();
+
+    // ปากปล่อง + แสง
+    const craterG = ctx.createRadialGradient(85, 40, 2, 85, 42, 28);
+    craterG.addColorStop(0, "#fff59d");
+    craterG.addColorStop(0.3, "#ff6d00");
+    craterG.addColorStop(0.7, "#bf360c");
+    craterG.addColorStop(1, "rgba(80,20,0,0)");
+    ctx.fillStyle = craterG;
+    ctx.beginPath(); ctx.ellipse(85, 42, 26, 12, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#1a0000";
+    ctx.beginPath(); ctx.ellipse(85, 40, 14, 6, 0, 0, Math.PI*2); ctx.fill();
+
+    // เปลวไฟจากปล่อง (หลายชั้น)
+    for(let f=0; f<7; f++){
+      const fx = 85 + Math.sin(t*2+f)*6;
+      const fy = 28 - f*7 - Math.sin(t*3+f)*3;
+      const fw = 10 - f*0.8;
+      const alpha = 0.75 - f*0.08;
+      const grd = ctx.createRadialGradient(fx, fy, 1, fx, fy, fw);
+      grd.addColorStop(0, `rgba(255,255,200,${alpha})`);
+      grd.addColorStop(0.4, `rgba(255,${140+f*10},0,${alpha*0.9})`);
+      grd.addColorStop(1, `rgba(255,40,0,0)`);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.moveTo(fx-fw, fy+fw);
+      ctx.quadraticCurveTo(fx-fw*0.3, fy-fw*0.5, fx, fy-fw*1.2);
+      ctx.quadraticCurveTo(fx+fw*0.3, fy-fw*0.5, fx+fw, fy+fw);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ลาวาไหลลงภูเขา
+    ctx.strokeStyle = "#ff3d00";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(85, 48);
+    ctx.quadraticCurveTo(100, 75, 78, 115);
+    ctx.quadraticCurveTo(70, 130, 75, 145);
+    ctx.stroke();
+    ctx.strokeStyle = "#ffab40";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(85, 48);
+    ctx.quadraticCurveTo(96, 78, 80, 118);
+    ctx.stroke();
+    // แสงลาวาไหล
+    ctx.strokeStyle = "rgba(255,235,59,0.45)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(84, 50);
+    ctx.quadraticCurveTo(94, 80, 79, 120);
+    ctx.stroke();
+
+    // ภูเขาไฟลูกเล็กด้านหลัง
+    ctx.fillStyle = "#4e342e";
+    ctx.beginPath();
+    ctx.moveTo(130, 110);
+    ctx.lineTo(160, 55);
+    ctx.lineTo(190, 110);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#e64a19";
+    ctx.beginPath(); ctx.ellipse(160, 58, 10, 5, 0, 0, Math.PI*2); ctx.fill();
+    // เปลวเล็ก
+    ctx.fillStyle = `rgba(255,160,0,${0.5+0.3*Math.sin(t*2)})`;
+    ctx.beginPath();
+    ctx.moveTo(160, 55);
+    ctx.lineTo(155, 42);
+    ctx.lineTo(165, 42);
+    ctx.closePath();
+    ctx.fill();
+
+    // หินลาวา / เกาะหิน
+    ctx.fillStyle = "#3e2723";
+    ctx.beginPath();
+    ctx.moveTo(W-5, 95);
+    ctx.lineTo(W-50, 60);
+    ctx.lineTo(W-95, 105);
+    ctx.lineTo(W-20, 140);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath();
+    ctx.moveTo(W-50, 60);
+    ctx.lineTo(W-95, 105);
+    ctx.lineTo(W-40, 120);
+    ctx.closePath();
+    ctx.fill();
+    // รอยลาวาบนหิน
+    ctx.strokeStyle = "#ff6d00";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(W-55, 70);
+    ctx.quadraticCurveTo(W-40, 95, W-30, 125);
+    ctx.stroke();
+
+    // เถ้าถ่าน / ประกายลอย
+    for(let i=0;i<16;i++){
+      const px = 50 + Math.sin(t*0.8+i*1.1)*40 + i*8;
+      const py = 20 + Math.cos(t*1.2+i)*15 + (i%5)*8;
+      const life = 0.4 + 0.6*Math.abs(Math.sin(t*2+i));
+      ctx.fillStyle = i%3===0
+        ? `rgba(255,200,50,${life})`
+        : `rgba(255,80,0,${life*0.85})`;
+      ctx.beginPath();
+      ctx.arc(px % (W-20), py, 1.5+(i%3), 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // แสงสะท้อนบนน้ำสีลาวา
+    const waterLava = ctx.createLinearGradient(0, 180, 0, H);
+    waterLava.addColorStop(0, "rgba(255,80,0,0.08)");
+    waterLava.addColorStop(0.4, "rgba(255,40,0,0.12)");
+    waterLava.addColorStop(1, "rgba(40,0,0,0.2)");
+    ctx.fillStyle = waterLava;
+    ctx.fillRect(0, 180, W, H-180);
+
+    // ระลอกแสงไฟบนน้ำ
+    ctx.strokeStyle = "rgba(255,150,50,0.15)";
+    ctx.lineWidth = 1.5;
+    for(let i=0;i<4;i++){
+      ctx.beginPath();
+      for(let x=0;x<=W;x+=10){
+        const y = 200 + i*25 + Math.sin(x*0.05 + t + i)*5;
+        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+
+    // ควันจากปล่อง
+    for(let i=0;i<5;i++){
+      const sx = 85 + Math.sin(t*0.5+i)*12;
+      const sy = 10 - i*8;
+      ctx.fillStyle = `rgba(60,40,40,${0.15-i*0.02})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 12+i*4, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+
+
+  // ตกแต่งเกาะโบราณ
+  if(currentLoc===8){
+    const t = Date.now()/700;
+    const W = canvas.width, H = canvas.height;
+
+    // แสงโบราณอุ่น
+    const ag = ctx.createRadialGradient(W*0.5, 40, 10, W*0.5, 60, 160);
+    ag.addColorStop(0, isDay ? "rgba(255,224,130,0.2)" : "rgba(255,160,50,0.12)");
+    ag.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = ag;
+    ctx.fillRect(0, 0, W, 140);
+
+    // พีระมิด / ซากวิหารซ้าย
+    ctx.fillStyle = "#5d4037";
+    ctx.beginPath();
+    ctx.moveTo(20, 130);
+    ctx.lineTo(70, 45);
+    ctx.lineTo(120, 130);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath();
+    ctx.moveTo(70, 45);
+    ctx.lineTo(120, 130);
+    ctx.lineTo(80, 130);
+    ctx.closePath();
+    ctx.fill();
+    // ขั้นบันได
+    ctx.strokeStyle = "rgba(215,204,200,0.35)";
+    ctx.lineWidth = 1.5;
+    for(let i=0;i<4;i++){
+      const y = 55 + i*18;
+      const w = 12 + i*10;
+      ctx.beginPath();
+      ctx.moveTo(70-w, y);
+      ctx.lineTo(70+w, y);
+      ctx.stroke();
+    }
+    // ประตูมืด
+    ctx.fillStyle = "#1a0a00";
+    ctx.fillRect(62, 95, 16, 28);
+
+    // เสาหินโบราณขวา
+    ctx.fillStyle = "#6d4c41";
+    ctx.fillRect(W-55, 50, 14, 85);
+    ctx.fillRect(W-30, 40, 12, 95);
+    ctx.fillStyle = "#8d6e63";
+    ctx.fillRect(W-58, 48, 20, 8);
+    ctx.fillRect(W-33, 38, 18, 8);
+    // รอยแตก
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(W-48, 60); ctx.lineTo(W-52, 100); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W-24, 55); ctx.lineTo(W-20, 110); ctx.stroke();
+
+    // รูนเรืองแสงบนเสา
+    ctx.fillStyle = `rgba(255,193,7,${0.4+0.35*Math.sin(t*2)})`;
+    for(let i=0;i<3;i++){
+      ctx.fillRect(W-51, 65+i*22, 6, 5);
+      ctx.fillRect(W-26, 55+i*25, 5, 5);
+    }
+
+    // แท่นหินกลางน้ำ
+    ctx.fillStyle = "#4e342e";
+    ctx.beginPath();
+    ctx.ellipse(W*0.5, 145, 55, 14, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "#6d4c41";
+    ctx.beginPath();
+    ctx.ellipse(W*0.5, 140, 40, 10, 0, 0, Math.PI*2);
+    ctx.fill();
+    // ไฟโบราณบนแท่น
+    const fx = W*0.5, fy = 128;
+    for(let i=0;i<5;i++){
+      const ox = Math.sin(t*3+i)*3;
+      const oy = -i*5 - Math.sin(t*2+i)*2;
+      const grd = ctx.createRadialGradient(fx+ox, fy+oy, 1, fx+ox, fy+oy, 8-i);
+      grd.addColorStop(0, `rgba(255,255,200,${0.8-i*0.12})`);
+      grd.addColorStop(0.5, `rgba(255,152,0,${0.5-i*0.08})`);
+      grd.addColorStop(1, "rgba(183,28,28,0)");
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(fx+ox, fy+oy, 8-i, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // เศษหินลอย / ฝุ่นโบราณ
+    for(let i=0;i<10;i++){
+      const px = 30 + (i*37)%(W-40);
+      const py = 40 + Math.sin(t+i)*20 + (i%4)*15;
+      ctx.fillStyle = `rgba(215,204,200,${0.25+0.3*Math.sin(t*1.5+i)})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 1.5+(i%2), 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // สะท้อนน้ำสีน้ำตาลทอง
+    const wg = ctx.createLinearGradient(0, 160, 0, H);
+    wg.addColorStop(0, "rgba(141,110,99,0.12)");
+    wg.addColorStop(1, "rgba(62,39,35,0.2)");
+    ctx.fillStyle = wg;
+    ctx.fillRect(0, 160, W, H-160);
+  }
+
+  // ตกแต่งเกาะสายรุ้ง
+  if(currentLoc===12){
+    const t = Date.now()/800;
+    // สายรุ้งโค้ง
+    const bands = ["#ff1744","#ff9100","#ffea00","#00e676","#00b0ff","#2979ff","#d500f9"];
+    for(let i=0;i<7;i++){
+      ctx.strokeStyle = bands[i];
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(canvas.width*0.5, canvas.height*0.85, 120+i*7, Math.PI*1.15, Math.PI*1.85);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // เกาะคริสตัลสี
+    for(let i=0;i<6;i++){
+      const cx = 40+i*55, cy = 70+Math.sin(t+i)*6;
+      ctx.fillStyle = bands[i];
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy-12); ctx.lineTo(cx-6, cy+8); ctx.lineTo(cx+6, cy+8);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // ประกาย
+    for(let i=0;i<12;i++){
+      ctx.fillStyle = bands[i%7];
+      ctx.globalAlpha = 0.4+0.4*Math.sin(t*2+i);
+      ctx.beginPath();
+      ctx.arc(30+i*28, 40+Math.sin(t+i)*20, 2, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ตกแต่งหุบเขาออบซิเดียน
+  if(currentLoc===13){
+    const t = Date.now()/700;
+    // หน้าผาดำซ้าย-ขวา
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.moveTo(0, 40); ctx.lineTo(70, 30); ctx.lineTo(50, 160); ctx.lineTo(0, 180);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(canvas.width, 35); ctx.lineTo(canvas.width-75, 25); ctx.lineTo(canvas.width-45, 170); ctx.lineTo(canvas.width, 185);
+    ctx.closePath(); ctx.fill();
+    // เงา
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.fillRect(0, 100, 40, 80);
+    // ผลึกออบซิเดียนเงา
+    for(let i=0;i<5;i++){
+      const x = 90+i*40;
+      ctx.fillStyle = i%2? "#263238" : "#37474f";
+      ctx.beginPath();
+      ctx.moveTo(x, 55); ctx.lineTo(x-10, 90); ctx.lineTo(x+10, 90);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(144,164,174,0.5)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // แสงม่วงจางในเงา
+    const g = ctx.createRadialGradient(canvas.width/2, 80, 10, canvas.width/2, 90, 100);
+    g.addColorStop(0, "rgba(100,50,150,0.15)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(50, 20, canvas.width-100, 120);
+    // เศษแก้วลอย
+    for(let i=0;i<8;i++){
+      ctx.fillStyle = `rgba(176,190,197,${0.3+0.4*Math.sin(t+i)})`;
+      ctx.beginPath();
+      ctx.arc(60+i*35, 100+Math.sin(t*1.5+i)*30, 2, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  // ตกแต่งทะเลเมฆ
+  if(currentLoc===14){
+    const t = Date.now()/1000;
+    // เมฆก้อนใหญ่
+    function cloud(x,y,s,a){
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      ctx.beginPath(); ctx.arc(x, y, 16*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+18*s, y-6*s, 14*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+32*s, y+2*s, 12*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+12*s, y+8*s, 13*s, 0, Math.PI*2); ctx.fill();
+    }
+    cloud(40+Math.sin(t)*10, 45, 1.2, 0.85);
+    cloud(180+Math.cos(t*0.7)*15, 30, 1.0, 0.7);
+    cloud(280+Math.sin(t*0.5)*12, 55, 1.3, 0.8);
+    cloud(100, 70, 0.8, 0.55);
+    cloud(250, 80, 0.9, 0.5);
+    // แสงซึมผ่านเมฆ
+    const sg = ctx.createRadialGradient(200, 40, 5, 200, 60, 120);
+    sg.addColorStop(0, "rgba(255,255,255,0.25)");
+    sg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, 0, canvas.width, 120);
+    // เกาะลอยเล็ก
+    ctx.fillStyle = "#a5d6a7";
+    ctx.beginPath(); ctx.ellipse(80, 110, 35, 12, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#66bb6a";
+    ctx.beginPath(); ctx.arc(70, 100, 10, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(90, 98, 8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#81c784";
+    ctx.beginPath(); ctx.ellipse(280, 120, 28, 10, 0, 0, Math.PI*2); ctx.fill();
+  }
+
+  drawRodSet(currentRod, boatX, hookY, rc);
   ctx.lineCap = "butt";
   try{ rzFront(currentLoc); }catch(e){}
   drawIslandLight(currentLoc);
@@ -8098,6 +8131,69 @@ function drawInvRod(canvas, rodId){
 }
 
 function closePanel(){ panel.style.display='none'; }
+document.getElementById('closeX').addEventListener('click',closePanel);
+// ===== จัดหมวดหมู่ในหน้าต่างทุกบาน: แท็บหมวด + ช่องแบบล็อก (กริด) + หัว/ปุ่มปิดตรึงไว้ =====
+(function(){
+  const root=document.getElementById('panelContent');
+  let busy=false; const lastTab={};
+  function organize(){
+    if(busy||!root.firstChild) return;
+    if(root.querySelector(':scope > .orgdone')) return;
+    busy=true;
+    try{
+      const nodes=Array.from(root.childNodes).filter(n=>!(n.nodeType===3&&!n.textContent.trim()));
+      const groups=[]; let cur=null;
+      nodes.forEach(n=>{
+        const isTitle=n.nodeType===1&&n.classList&&n.classList.contains('section-title');
+        if(isTitle){ cur={title:n.textContent.replace(/\s*\(.*?\)\s*/g,' ').replace(/\s+/g,' ').trim()||'หมวด',nodes:[n]}; groups.push(cur); }
+        else { if(!cur){ cur={title:null,nodes:[]}; groups.push(cur); } cur.nodes.push(n); }
+      });
+      const key=(document.getElementById('panelTitle').textContent||'');
+      const frag=document.createDocumentFragment();
+      const named=groups.filter(g=>g.title);
+      // กลุ่มที่ไม่มีหัวข้อ (ส่วนบนสุด) ไว้เหนือแท็บ เช่น สรุป/ปุ่มขายทั้งหมด
+      const head=groups.find(g=>!g.title);
+      const marker=document.createElement('span'); marker.className='orgdone'; marker.style.display='none';
+      let bar=null, grps=[];
+      if(named.length>=2){
+        bar=document.createElement('div'); bar.className='tabsbar';
+      }
+      if(head){ const hd=document.createElement('div'); head.nodes.forEach(n=>hd.appendChild(n)); gridify(hd); frag.appendChild(hd); }
+      if(bar) frag.appendChild(bar);
+      let active=Math.max(0,named.findIndex(g=>g.title===lastTab[key])); if(active<0) active=0;
+      named.forEach((g,i)=>{
+        const box=document.createElement('div'); box.className='grp';
+        const first=g.nodes[0];
+        if(!bar){ box.appendChild(first.cloneNode(true)); box.querySelector('.section-title').style.display='block'; }
+        g.nodes.slice(1).forEach(n=>box.appendChild(n));
+        if(!bar) { /* หัวข้อเดี่ยวคงไว้ */ box.classList.remove('grp'); box.classList.add('grp1'); }
+        gridify(box);
+        if(bar){
+          box.style.display=(i===active)?'block':'none';
+          const chip=document.createElement('button'); chip.className='tabchip'+(i===active?' on':''); chip.textContent=g.title;
+          chip.addEventListener('click',()=>{
+            lastTab[key]=g.title; grps.forEach((b,j)=>{ b.style.display=(j===i)?'block':'none'; });
+            Array.from(bar.children).forEach((c,j)=>c.classList.toggle('on',j===i));
+            chip.scrollIntoView({block:'nearest',inline:'center'}); document.getElementById('panel').scrollTop=0;
+          });
+          bar.appendChild(chip);
+        }
+        grps.push(box); frag.appendChild(box);
+      });
+      frag.appendChild(marker);
+      root.innerHTML=''; root.appendChild(frag);
+    }catch(e){ console.warn('organize',e); }
+    busy=false;
+  }
+  function gridify(box){
+    const kids=Array.from(box.children); let run=[];
+    const flush=()=>{ if(run.length>=2){ const g=document.createElement('div'); g.className='slotgrid'; box.insertBefore(g,run[0]); run.forEach(r=>g.appendChild(r)); } run=[]; };
+    kids.forEach(k=>{ if(k.classList&&k.classList.contains('item')) run.push(k); else flush(); });
+    flush();
+  }
+  new MutationObserver(()=>{ if(!busy) setTimeout(organize,0); }).observe(root,{childList:true});
+  window.__organizePanel=organize;
+})();
 document.getElementById('closePanel').addEventListener('click',closePanel);
 
 
@@ -8675,7 +8771,7 @@ applyUILanguage();
     sock.onerror=function(){};
     sock.onclose=function(){
       connecting=false; stopPos();
-      var wasIn=!!myId; myId=null; others={}; roster=[];
+      var wasIn=!!myId; myId=null; others={}; roster=[]; tradeReset();
       if(sock!==ws) return;
       if(wantRoom&&tries<5){
         tries++; setStatus(T("หลุดการเชื่อมต่อ กำลังลองใหม่ ("+tries+"/5)...","Disconnected, retrying ("+tries+"/5)..."));
@@ -8688,7 +8784,7 @@ applyUILanguage();
     };
   }
   function leaveRoom(){
-    wantRoom=false; roomCode=""; myId=null; others={}; roster=[]; logLines=[]; stopPos();
+    wantRoom=false; roomCode=""; myId=null; others={}; roster=[]; logLines=[]; stopPos(); tradeReset();
     try{ if(ws) ws.close(); }catch(e){}
     ws=null; setStatus(""); if(els.mpLog) els.mpLog.innerHTML=""; refreshUI();
   }
@@ -8701,18 +8797,21 @@ applyUILanguage();
     stopPos();
     posTimer=setInterval(function(){
       if(!myId) return;
-      var s=Math.round(boatX)+"|"+currentLoc+"|"+level;
+      var st=myState(), hy=Math.round(hookY), rod=(typeof currentRod==="number")?currentRod:0;
+      var s=Math.round(boatX)+"|"+currentLoc+"|"+level+"|"+st+"|"+hy+"|"+rod;
       if(s===lastSent) return; lastSent=s;
-      send({t:"pos",bx:Math.round(boatX),loc:currentLoc,level:level});
-    },300);
+      send({t:"pos",bx:Math.round(boatX),loc:currentLoc,level:level,st:st,hy:hy,rod:rod});
+    },130);
   }
   function stopPos(){ if(posTimer){clearInterval(posTimer);posTimer=null;} lastSent=""; }
 
   function onMsg(m){
     switch(m.t){
+      case "trade_inv": case "trade_sent": case "trade_open": case "trade_state": case "trade_go": case "trade_done": case "trade_end":
+        tradeOnMsg(m); break;
       case "joined":
         myId=m.you; roster=m.players||[]; others={};
-        roster.forEach(function(r){ if(r.id!==myId) others[r.id]={name:r.name,loc:r.loc,level:r.level,bx:180,tx:180}; });
+        roster.forEach(function(r){ if(r.id!==myId) others[r.id]={name:r.name,loc:r.loc,level:r.level,bx:180,tx:180,st:r.st|0,hy:r.hy||55,rod:r.rod|0}; });
         setStatus(T("เชื่อมต่อแล้ว ✓","Connected ✓")); lastSent="";
         addLog('<div style="color:#81c784">'+T("เข้าห้อง ","Joined room ")+esc(m.room)+(m.name!==currentUser?' ('+esc(m.name)+')':'')+'</div>');
         startPos(); refreshUI(); break;
@@ -8722,17 +8821,18 @@ applyUILanguage();
         roster.forEach(function(r){
           if(r.id===myId) return; seen[r.id]=1;
           var o=others[r.id]; if(!o) o=others[r.id]={name:r.name,bx:180,tx:180};
-          o.name=r.name; o.loc=r.loc; o.level=r.level;
+          o.name=r.name; o.loc=r.loc; o.level=r.level; if(r.rod!=null){ o.rod=r.rod|0; o.st=r.st|0; o.hy=r.hy||55; }
         });
         Object.keys(others).forEach(function(k){ if(!seen[k]) delete others[k]; });
         refreshUI(); break;
       case "pos":
-        var o=others[m.id]; if(o){ o.tx=m.bx; o.loc=m.loc; } break;
+        var o=others[m.id]; if(o){ o.tx=m.bx; o.loc=m.loc; if(m.rod!=null){ o.rod=m.rod|0; o.st=m.st|0; o.hy=m.hy||55; } } break;
       case "chat":
         addLog('<div><b style="color:'+(m.id===myId?"#ffd54f":"#4fc3f7")+'">'+esc(m.from)+':</b> '+esc(m.text)+'</div>',m.id!==myId); break;
       case "sys":
         addLog('<div style="color:#90a4ae">'+esc(m.text)+'</div>'); break;
       case "catch":
+        if(m.id!==myId&&others[m.id]) others[m.id].fx={t:Date.now(),rarity:m.rarity,fish:m.fish};
         if(m.rarity==="ธรรมดา") break;
         var icon={"หายาก":"🔷","มหากาพย์":"🟣","ตำนาน":"🌟","บอส":"👹"}[m.rarity]||"🐟";
         var who=(m.id===myId)?T("คุณ","You"):m.from;
@@ -8745,36 +8845,341 @@ applyUILanguage();
     }
   }
 
-  // ---------- วาดเรือเพื่อน ----------
+  // ---------- วาดเรือเพื่อน (จัดช่อง ไม่ซ้อนกัน + คันเบ็ด + ท่าตกปลา) ----------
+  var SLOTS=[62,298,121,239,22,338];
+  function hueOf(s){ var h=0; for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))%360; return h; }
+  var ST_IDLE=0, ST_AIM=1, ST_CAST=2, ST_WAIT=3, ST_BITE=4;
+  function myState(){
+    var s=(typeof fishingState==="string")?fishingState:"idle";
+    return s==="castAim"?1:s==="casting"?2:s==="waiting"?3:s==="biting"?4:s==="traveling"?5:0;
+  }
+  var FS_NAME=["idle","castAim","casting","waiting","biting","traveling"];
+  function drawFriendBoat(x,o,idx,now){
+    var bob=Math.sin(now/650+idx*1.7)*1.1, hue=hueOf(o.name||"?");
+    var hy=o.shy, st=o.st|0, rod=(o.rod|0);
+    ctx.save();
+    // เงา+ระลอกน้ำ
+    ctx.fillStyle="rgba(0,0,0,0.12)"; ctx.beginPath(); ctx.ellipse(x+4,62,34,9,0,0,6.283); ctx.fill();
+    ctx.fillStyle="rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(x+2,58,26,6,0,0,6.283); ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,0.22)"; ctx.lineWidth=1;
+    for(var r=0;r<3;r++){ ctx.globalAlpha=0.26-r*0.07; ctx.beginPath(); ctx.ellipse(x,60+r*5,20+r*8,4+r,0,0,6.283); ctx.stroke(); }
+    ctx.globalAlpha=0.2; ctx.save(); ctx.scale(1,0.55); ctx.translate(0,58/0.55); ctx.fillStyle="#3e2723";
+    ctx.beginPath(); ctx.moveTo(x-26,40); ctx.lineTo(x+26,40); ctx.lineTo(x+16,54); ctx.lineTo(x-16,54); ctx.closePath(); ctx.fill(); ctx.restore();
+    ctx.globalAlpha=1;
+    // ตัวเรือ
+    ctx.translate(0,bob);
+    ctx.fillStyle="#4e342e"; ctx.beginPath(); ctx.moveTo(x-28,40); ctx.lineTo(x+28,40); ctx.lineTo(x+18,54); ctx.lineTo(x-18,54); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,0.28)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(x-24,41); ctx.lineTo(x+24,41); ctx.stroke();
+    ctx.fillStyle="rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.moveTo(x-18,44); ctx.lineTo(x+18,44); ctx.lineTo(x+12,52); ctx.lineTo(x-12,52); ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#6d4c41"; ctx.beginPath(); ctx.moveTo(x-22,40); ctx.lineTo(x+22,40); ctx.lineTo(x+14,48); ctx.lineTo(x-14,48); ctx.closePath(); ctx.fill();
+    // แถบสีประจำตัวที่ข้างเรือ
+    ctx.fillStyle="hsl("+hue+",70%,55%)"; ctx.fillRect(x-20,41.5,40,2.5);
+    ctx.fillStyle="rgba(0,0,0,0.2)"; ctx.beginPath(); ctx.ellipse(x+3,38,8,3,0,0,6.283); ctx.fill();
+    // คน (ผมสีต่างกันตามชื่อ + หมวก)
+    ctx.fillStyle="#ffe0b2"; ctx.beginPath(); ctx.arc(x,28,9,0,6.283); ctx.fill();
+    ctx.fillStyle="hsl("+hue+",45%,32%)"; ctx.beginPath(); ctx.arc(x,26,5,Math.PI,6.283); ctx.fill();
+    ctx.fillStyle="hsl("+hue+",70%,55%)"; ctx.fillRect(x-9,24,18,2);
+    ctx.restore();
+    // คันเบ็ด+สาย+ตะขอ (ใช้ตัววาดเดียวกับของเรา)
+    if(typeof drawRodSet==="function" && st!==5){
+      var saveFS=fishingState;
+      try{
+        fishingState=FS_NAME[st]||"idle";
+        var rc=(typeof getRodColors==="function")?getRodColors(rod):{rod:"#8d6e63",line:"#fff",hook:"#ccc",glow:"#fff"};
+        ctx.save(); ctx.translate(0,bob*0.6);
+        drawRodSet(rod,x,Math.max(55,hy-bob*0.6),rc);
+        ctx.restore();
+      }catch(e){}
+      fishingState=saveFS; ctx.lineCap="butt";
+    }
+    // ทุ่น/ปลากินเหยื่อ
+    var hx=x+14;
+    if(st===ST_WAIT){
+      var wy=Math.min(hy,260);
+      ctx.fillStyle="rgba(255,255,255,0.35)";
+      ctx.beginPath(); ctx.ellipse(hx,wy+1,6+Math.sin(now/400)*1.5,1.8,0,0,6.283); ctx.fill();
+    } else if(st===ST_BITE){
+      var k=(now/140)%1;
+      ctx.strokeStyle="rgba(255,255,255,"+(0.7-k*0.6)+")"; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.ellipse(hx,Math.min(hy,260)+1,6+k*16,2+k*5,0,0,6.283); ctx.stroke();
+      ctx.font="bold 15px sans-serif"; ctx.textAlign="center"; ctx.fillStyle="#ff5252";
+      ctx.strokeStyle="#fff"; ctx.lineWidth=3; ctx.strokeText("!",x+2,14+Math.sin(now/90)*2); ctx.fillText("!",x+2,14+Math.sin(now/90)*2);
+    } else if(st===ST_AIM){
+      ctx.fillStyle="rgba(255,255,255,0.8)"; ctx.font="bold 9px sans-serif"; ctx.textAlign="center"; ctx.fillText("…",x+2,16);
+    }
+    // ฟองปลาที่จับได้
+    if(o.fx){
+      var age=(now-o.fx.t)/1400;
+      if(age>=1) o.fx=null;
+      else {
+        var fy=60-Math.sin(age*Math.PI)*58, fx=hx-4+age*10;
+        ctx.globalAlpha=1-Math.max(0,age-0.7)/0.3;
+        ctx.font="16px sans-serif"; ctx.textAlign="center"; ctx.fillText("🐟",fx,fy);
+        ctx.strokeStyle="rgba(255,255,255,"+(0.6*(1-age))+")"; ctx.lineWidth=1.4;
+        ctx.beginPath(); ctx.ellipse(hx,63,6+age*26,2+age*7,0,0,6.283); ctx.stroke();
+        var rc2={"หายาก":"#4fc3f7","มหากาพย์":"#ce93d8","ตำนาน":"#ffd54f","บอส":"#ff5252"}[o.fx.rarity];
+        if(rc2){ ctx.fillStyle=rc2; ctx.font="bold 9px sans-serif"; ctx.fillText(o.fx.fish,x,6-age*6); }
+        ctx.globalAlpha=1;
+      }
+    }
+    // ป้ายชื่อใต้เรือ
+    ctx.save();
+    ctx.font="bold 9px sans-serif"; ctx.textAlign="center";
+    var label=o.name+" Lv."+o.level, w=ctx.measureText(label).width+10;
+    ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fillRect(x-w/2,66,w,12);
+    ctx.fillStyle="hsl("+hue+",80%,78%)"; ctx.fillText(label,x,75.5);
+    ctx.restore();
+  }
   window.mpDrawFriends=function(){
     if(!myId) return;
-    var keys=Object.keys(others);
-    for(var i=0;i<keys.length;i++){
-      var o=others[keys[i]];
-      if(o.loc!==currentLoc) continue;
-      o.bx+=(o.tx-o.bx)*0.2;
-      var x=o.bx, bob=Math.sin(Date.now()/600+i)*1.2;
-      ctx.save();
-      ctx.globalAlpha=0.9;
-      ctx.fillStyle="rgba(0,0,0,0.25)";
-      ctx.beginPath(); ctx.ellipse(x+3,60,26,6,0,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle="#7e57c2";
-      ctx.beginPath(); ctx.moveTo(x-20,41+bob); ctx.lineTo(x+20,41+bob); ctx.lineTo(x+12,54+bob); ctx.lineTo(x-12,54+bob); ctx.closePath(); ctx.fill();
-      ctx.fillStyle="rgba(255,255,255,0.35)";
-      ctx.fillRect(x-20,41+bob,40,2.5);
-      ctx.fillStyle="#ffcc80"; ctx.beginPath(); ctx.arc(x,34+bob,5,0,Math.PI*2); ctx.fill();
-      ctx.font="bold 10px sans-serif"; ctx.textAlign="center";
-      var label=o.name+" Lv."+o.level, w=ctx.measureText(label).width+8;
-      ctx.fillStyle="rgba(0,0,0,0.55)"; ctx.fillRect(x-w/2,16+bob,w,13);
-      ctx.fillStyle="#fff"; ctx.fillText(label,x,26+bob);
-      ctx.restore();
+    var now=Date.now(), list=Object.keys(others).filter(function(k){ return others[k].loc===currentLoc; }).sort();
+    for(var i=0;i<list.length&&i<SLOTS.length;i++){
+      var o=others[list[i]];
+      if(o.shy==null) o.shy=o.hy||55;
+      o.shy+=((o.hy||55)-o.shy)*0.4;
+      drawFriendBoat(SLOTS[i],o,i,now);
     }
   };
   window.mpSendCatch=function(fish,rarity,weight,price){
     send({t:"catch",fish:fish,rarity:rarity,weight:weight,price:price});
   };
 
-  build();
+  // ===== ระบบแลกของ (ขอแลก → เลือกของ → ทั้งคู่ยอมรับ → นับถอยหลัง 5 วิ → สลับของ) =====
+  var tr=null, invIn=null, sentTo=null, sel=newSel(), selOpen=false, trTick=null, offerTimer=null, invTimer=null, trOv=null, trInvEl=null;
+  function newSel(){ return {money:0,rods:{},baits:{},mats:{},bag:{},fish:{}}; }
+  function fishOk(k){ return k.length<=60 && !/[\u0000-\u001f<>]/.test(k); }
+  function fishLabel(k,info){ var e=info||((typeof fishEntry!=="undefined"&&fishEntry[k])||{}); var nm=e.name||String(k).split("@")[0]; var w=(e.weight!=null&&e.weight!=="?")?" "+e.weight+"kg":""; return nm+w+(e.rarity?" ("+e.rarity+")":""); }
+  function sumVals(o){ var s=0; Object.keys(o||{}).forEach(function(k){ s+=o[k]|0; }); return s; }
+  function fmt(n){ try{ return Number(n).toLocaleString(); }catch(e){ return String(n); } }
+  function toast(t){ if(typeof showMessage==="function") showMessage(t,2600); addLog('<div style="color:#ffb74d">🔄 '+esc(t)+'</div>',false); }
+  function curOffer(){ return buildOffer(sel); }
+  function buildOffer(s){
+    var o={money:0,rods:[],baits:{},mats:{},bag:{},fish:{},fishInfo:{},enchants:{}};
+    o.money=Math.max(0,Math.min(Math.floor(Number(s.money)||0),Math.floor(money)));
+    Object.keys(s.rods).forEach(function(k){ var id=+k; if(s.rods[k]&&id!==0&&rods[id]&&rods[id].owned){ o.rods.push(id); if(rodEnchants&&rodEnchants[id]) o.enchants[id]=rodEnchants[id]; } });
+    Object.keys(s.baits).forEach(function(k){ var id=+k,n=Math.min(s.baits[k]|0,baits[id]?(baits[id].owned|0):0); if(id!==0&&n>0) o.baits[k]=n; });
+    Object.keys(s.mats).forEach(function(k){ var n=Math.min(s.mats[k]|0,materials[k]|0); if(n>0) o.mats[k]=n; });
+    Object.keys(s.bag).forEach(function(k){ var n=Math.min(s.bag[k]|0,bagItems[k]|0); if(n>0) o.bag[k]=n; });
+    Object.keys(s.fish).forEach(function(k){ var n=Math.min(s.fish[k]|0,inventory[k]|0); if(n>0&&!lockedFish[k]&&fishOk(k)){ o.fish[k]=n; if(fishEntry[k]) o.fishInfo[k]=fishEntry[k]; } });
+    return o;
+  }
+  function canGive(o){
+    if(!o) return "";
+    if((o.money|0)>Math.floor(money)) return T("เงินไม่พอ","Not enough money");
+    for(var i=0;i<o.rods.length;i++){ var r=rods[o.rods[i]]; if(!r||!r.owned) return T("ไม่มีเบ็ดที่เสนอ","Rod missing"); }
+    var k;
+    for(k in o.baits) if(!baits[+k]||(baits[+k].owned|0)<o.baits[k]) return T("เหยื่อไม่พอ","Not enough bait");
+    for(k in o.mats) if((materials[k]|0)<o.mats[k]) return T("ชิ้นส่วนไม่พอ","Not enough materials");
+    for(k in o.bag) if((bagItems[k]|0)<o.bag[k]) return T("ของในกระเป๋าไม่พอ","Not enough items");
+    for(k in o.fish) if((inventory[k]|0)<o.fish[k]||lockedFish[k]) return T("ไม่มีปลาที่เสนอ","Fish missing");
+    return "";
+  }
+  function canReceive(theirs,mine){
+    if(!theirs) return "";
+    for(var i=0;i<theirs.rods.length;i++){ var r=rods[theirs.rods[i]]; if(!r) return T("เบ็ดไม่รู้จัก","Unknown rod"); if(r.owned&&!(mine&&mine.rods.indexOf(theirs.rods[i])>=0)) return T("คุณมี "+r.name+" อยู่แล้ว","You already own "+r.name); }
+    var k;
+    for(k in theirs.baits) if(!baits[+k]) return T("เหยื่อไม่รู้จัก","Unknown bait");
+    for(k in theirs.mats) if(materials[k]==null) return T("ชิ้นส่วนไม่รู้จัก","Unknown material");
+    for(k in theirs.bag) if(bagItems[k]==null) return T("ของไม่รู้จัก","Unknown item");
+    if(getTotalFish()-sumVals(mine&&mine.fish)+sumVals(theirs.fish)>maxBag) return T("กระเป๋าปลาเต็ม","Fish bag would be full");
+    return "";
+  }
+  function summarize(o,mode){
+    if(!o) return "";
+    var L=[];
+    if(o.money>0) L.push("💰 "+fmt(o.money));
+    o.rods.forEach(function(id){ L.push("🎣 "+(rods[id]?rods[id].name:"#"+id)+(o.enchants&&o.enchants[id]?" ✨":"")); });
+    Object.keys(o.baits).forEach(function(k){ L.push("🪱 "+(baits[+k]?baits[+k].name:"#"+k)+" ×"+o.baits[k]); });
+    Object.keys(o.mats).forEach(function(k){ L.push("🧱 "+k+" ×"+o.mats[k]); });
+    Object.keys(o.bag).forEach(function(k){ L.push("🎒 "+k+" ×"+o.bag[k]); });
+    Object.keys(o.fish).forEach(function(k){ L.push("🐟 "+fishLabel(k,o.fishInfo&&o.fishInfo[k])+" ×"+o.fish[k]); });
+    if(!L.length) return '<div style="color:#78909c">'+T("(ยังไม่ได้เลือกของ)","(nothing selected)")+'</div>';
+    return L.map(function(x){ return '<div>'+esc(x)+'</div>'; }).join("");
+  }
+  function nameOf(id){ for(var i=0;i<roster.length;i++) if(roster[i].id===id) return roster[i].name; return (tr&&tr.withName)||"?"; }
+
+  function buildTradeUI(){
+    var row=document.querySelector(".btn-row"), inv=document.getElementById("invBtn");
+    if(row&&!document.getElementById("tradeBtn")){
+      var b=document.createElement("button"); b.className="btn"; b.id="tradeBtn"; b.style.background="#ef6c00"; b.textContent=T("แลกของ","Trade");
+      if(inv&&inv.nextSibling) row.insertBefore(b,inv.nextSibling); else row.appendChild(b);
+      b.addEventListener("click",function(){ if(!myId){ toast(T("ต้องเข้าห้องเพื่อนก่อน (ปุ่ม 👥)","Join a friend room first (👥 button)")); return; } openTrade(); });
+    }
+    trOv=document.createElement("div"); trOv.id="trOverlay";
+    trOv.style.cssText="position:fixed;inset:0;z-index:75;background:rgba(0,0,0,.72);display:none;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px;box-sizing:border-box;font-family:inherit;color:#eceff1";
+    document.body.appendChild(trOv);
+    trOv.addEventListener("click",onTrClick); trOv.addEventListener("change",onTrChange);
+    trInvEl=document.createElement("div"); trInvEl.id="trInv";
+    trInvEl.style.cssText="position:fixed;left:8px;right:8px;top:8px;z-index:80;display:none;background:#3e2723;border:2px solid #ffb74d;border-radius:12px;padding:10px;color:#fff;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.6)";
+    document.body.appendChild(trInvEl);
+    trInvEl.addEventListener("click",function(e){
+      var a=e.target.getAttribute&&e.target.getAttribute("data-act"); if(!a||!invIn) return;
+      if(a==="invYes"){ send({t:"trade_res",from:invIn.from,ok:true}); }
+      else if(a==="invNo"){ send({t:"trade_res",from:invIn.from,ok:false}); }
+      invIn=null; renderInv();
+    });
+  }
+  function openTrade(){ if(!trOv) return; trOv.style.display="block"; renderTr(); }
+  function closeTrade(){ if(trOv) trOv.style.display="none"; }
+  function renderInv(){
+    if(!trInvEl) return;
+    if(!invIn){ trInvEl.style.display="none"; return; }
+    trInvEl.style.display="block";
+    trInvEl.innerHTML='<div style="margin-bottom:8px">🔄 <b>'+esc(invIn.name)+'</b> '+T("ขอแลกของกับคุณ","wants to trade with you")+'</div>'+
+      '<button data-act="invYes" style="padding:8px 18px;margin-right:8px;border:0;border-radius:8px;background:#2e7d32;color:#fff;font-size:1rem">'+T("ยอมรับ","Accept")+'</button>'+
+      '<button data-act="invNo" style="padding:8px 18px;border:0;border-radius:8px;background:#b71c1c;color:#fff;font-size:1rem">'+T("ปฏิเสธ","Decline")+'</button>';
+  }
+  var BTN="padding:8px 12px;border:0;border-radius:8px;color:#fff;font-size:.95rem;cursor:pointer;";
+  function renderTr(){
+    if(!trOv||trOv.style.display==="none") return;
+    var keepScroll=0, ch=document.getElementById("trChoose"); if(ch) keepScroll=ch.scrollTop;
+    var h='<div style="max-width:520px;margin:0 auto;background:#10202f;border:1px solid #ffb74d;border-radius:14px;padding:0 12px 12px">';
+    h+='<div style="position:sticky;top:0;z-index:3;background:#10202f;padding:10px 0 8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:1.1rem">🔄 '+T("แลกของ","Trade")+'</b><span data-act="close" style="cursor:pointer;padding:4px 10px;font-size:1.2rem">✕</span></div>';
+    if(!tr){
+      var list=roster.filter(function(r){ return r.id!==myId; });
+      if(sentTo) h+='<div style="margin-bottom:8px;color:#ffcc80">⏳ '+T("รอ ","Waiting for ")+esc(sentTo.name)+T(" ตอบรับ...","...")+' <button data-act="cancelReq" style="'+BTN+'background:#b71c1c;padding:4px 10px">'+T("ยกเลิก","Cancel")+'</button></div>';
+      if(!list.length) h+='<div style="color:#90a4ae">'+T("ยังไม่มีเพื่อนในห้อง","No friends in the room yet")+'</div>';
+      list.forEach(function(r){
+        h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #263b50"><span>👤 <b>'+esc(r.name)+'</b> Lv.'+(r.level|0)+' <span style="color:#78909c;font-size:.8rem">'+esc(locName(r.loc))+'</span></span><button data-act="req" data-id="'+esc(r.id)+'" style="'+BTN+'background:#ef6c00">'+T("ขอแลก","Request")+'</button></div>';
+      });
+    } else {
+      var other=tr.withId, mine=tr.offers[myId], theirs=tr.offers[other];
+      var errG=canGive(mine), errR=canReceive(theirs,mine), err=errG||errR;
+      var myAcc=!!tr.acc[myId], thAcc=!!tr.acc[other], cd=tr.state==="countdown"&&tr.endAt?Math.max(0,Math.ceil((tr.endAt-Date.now())/1000)):0;
+      h+='<div style="text-align:center;margin-bottom:8px;color:#ffcc80">'+T("กำลังแลกกับ ","Trading with ")+'<b>'+esc(tr.withName)+'</b></div>';
+      h+='<div style="display:flex;gap:8px">';
+      h+='<div style="flex:1;min-width:0;background:#0b1622;border-radius:10px;padding:8px;font-size:.88rem"><div style="font-weight:bold;margin-bottom:4px">'+T("ของคุณ","Your offer")+(myAcc?' ✅':'')+'</div>'+summarize(mine)+'</div>';
+      h+='<div style="flex:1;min-width:0;background:#0b1622;border-radius:10px;padding:8px;font-size:.88rem"><div style="font-weight:bold;margin-bottom:4px">'+esc(tr.withName)+(thAcc?' ✅':'')+'</div>'+summarize(theirs)+'</div>';
+      h+='</div>';
+      if(err) h+='<div style="margin-top:8px;color:#ff8a80;text-align:center">⚠️ '+esc(err)+'</div>';
+      if(tr.state==="countdown") h+='<div style="margin:12px 0;text-align:center;font-size:1.6rem;font-weight:bold;color:#ffd54f">⏳ '+T("แลกของใน ","Trading in ")+cd+'</div>';
+      else if(tr.state==="verify") h+='<div style="margin:12px 0;text-align:center;color:#a5d6a7">'+T("กำลังสลับของ...","Swapping items...")+'</div>';
+      else h+='<div style="margin:10px 0;text-align:center;color:#90a4ae;font-size:.85rem">'+(myAcc?T("รอ "+esc(tr.withName)+" กดยอมรับ","Waiting for "+esc(tr.withName)+" to accept"):T("เลือกของแล้วกดยอมรับ — ถ้ามีใครเปลี่ยนของ การยอมรับจะถูกรีเซ็ต","Pick items, then accept — any change resets acceptance"))+'</div>';
+      h+='<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px">';
+      if(tr.state==="open") h+='<button data-act="toggleSel" style="'+BTN+'background:#455a64">'+(selOpen?T("ซ่อนรายการ","Hide list"):T("เลือกของ","Choose items"))+'</button>';
+      if(tr.state==="open"){
+        var empty=!summarizeCount(mine)&&!summarizeCount(theirs);
+        h+='<button data-act="accept" '+((err||empty)&&!myAcc?'disabled':'')+' style="'+BTN+'background:'+(myAcc?'#f9a825':'#2e7d32')+';opacity:'+(((err||empty)&&!myAcc)?0.45:1)+'">'+(myAcc?T("ยกเลิกการยอมรับ","Un-accept"):T("✅ ยอมรับ","✅ Accept"))+'</button>';
+      }
+      h+='<button data-act="cancelTrade" style="'+BTN+'background:#c62828'+(tr.state==="countdown"?';box-shadow:0 0 12px #ff5252;font-weight:bold':'')+'">'+T("❌ ยกเลิกการแลก","❌ Cancel trade")+'</button>';
+      h+='</div>';
+      if(selOpen&&tr.state==="open") h+='<div id="trChoose" style="margin-top:10px;max-height:46vh;overflow:auto;background:#0b1622;border-radius:10px;padding:8px;font-size:.88rem">'+chooserHTML()+'</div>';
+    }
+    h+='</div>';
+    trOv.innerHTML=h;
+    var c2=document.getElementById("trChoose"); if(c2) c2.scrollTop=keepScroll;
+  }
+  function summarizeCount(o){ return o?(o.money>0||o.rods.length||sumVals(o.baits)||sumVals(o.mats)||sumVals(o.bag)||sumVals(o.fish)):0; }
+  function stepper(sec,key,label,have,cur){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 0;border-bottom:1px solid #1b2e42"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">'+esc(label)+' <span style="color:#78909c">('+have+')</span></span>'+
+      '<span style="white-space:nowrap"><button data-act="step" data-sec="'+sec+'" data-key="'+esc(key)+'" data-d="-1" style="'+BTN+'background:#455a64;padding:4px 10px">−</button> <b style="display:inline-block;min-width:26px;text-align:center">'+cur+'</b> <button data-act="step" data-sec="'+sec+'" data-key="'+esc(key)+'" data-d="1" style="'+BTN+'background:#455a64;padding:4px 10px">+</button> <button data-act="step" data-sec="'+sec+'" data-key="'+esc(key)+'" data-d="max" style="'+BTN+'background:#37474f;padding:4px 8px">'+T("ทั้งหมด","All")+'</button></span></div>';
+  }
+  function head(t){ return '<div style="margin:8px 0 2px;color:#ffcc80;font-weight:bold">'+t+'</div>'; }
+  function chooserHTML(){
+    var h=head("💰 "+T("เงิน","Money")+' <span style="color:#78909c;font-weight:normal">('+fmt(Math.floor(money))+')</span>');
+    h+='<input id="trMoney" type="number" min="0" inputmode="numeric" value="'+(sel.money||0)+'" style="width:100%;box-sizing:border-box;padding:6px;border-radius:6px;border:1px solid #ffb74d;background:#06121f;color:#fff">';
+    var rl=rods.filter(function(r){ return r.owned&&r.id!==0; });
+    if(rl.length){ h+=head("🎣 "+T("เบ็ด","Rods"));
+      rl.forEach(function(r){ h+='<label style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #1b2e42"><input type="checkbox" data-sec="rods" data-key="'+r.id+'" '+(sel.rods[r.id]?'checked':'')+'> '+esc(r.name)+(rodEnchants&&rodEnchants[r.id]?' ✨':'')+(currentRod===r.id?' <span style="color:#78909c">('+T("ใช้อยู่","equipped")+')</span>':'')+'</label>'; }); }
+    var bl=baits.filter(function(b){ return b.id!==0&&(b.owned|0)>0; });
+    if(bl.length){ h+=head("🪱 "+T("เหยื่อ","Bait")); bl.forEach(function(b){ h+=stepper("baits",String(b.id),b.name,b.owned|0,sel.baits[b.id]|0); }); }
+    var ml=Object.keys(materials).filter(function(k){ return (materials[k]|0)>0; });
+    if(ml.length){ h+=head("🧱 "+T("ชิ้นส่วน/วัตถุดิบ","Materials")); ml.forEach(function(k){ h+=stepper("mats",k,k,materials[k]|0,sel.mats[k]|0); }); }
+    var gl=Object.keys(bagItems).filter(function(k){ return (bagItems[k]|0)>0; });
+    if(gl.length){ h+=head("🗺️ "+T("แผนที่/ของในกระเป๋า","Maps & items")); gl.forEach(function(k){ h+=stepper("bag",k,k,bagItems[k]|0,sel.bag[k]|0); }); }
+    var fl=Object.keys(inventory).filter(function(k){ return (inventory[k]|0)>0&&!lockedFish[k]&&fishOk(k); });
+    if(fl.length){ h+=head("🐟 "+T("ปลา","Fish")); fl.forEach(function(k){ h+=stepper("fish",k,fishLabel(k),inventory[k]|0,sel.fish[k]|0); }); }
+    return h;
+  }
+  function pushOffer(){ clearTimeout(offerTimer); offerTimer=setTimeout(function(){ send({t:"trade_offer",offer:curOffer()}); },180); if(tr){ tr.offers[myId]=curOffer(); tr.acc[myId]=false; tr.acc[tr.withId]=false; } }
+  function onTrClick(e){
+    var el=e.target; while(el&&el!==trOv&&!(el.getAttribute&&el.getAttribute("data-act"))) el=el.parentNode;
+    if(!el||el===trOv) return;
+    var a=el.getAttribute("data-act");
+    if(a==="close"){ closeTrade(); return; }
+    if(a==="req"){ var id=el.getAttribute("data-id"); var nm=nameOf(id); send({t:"trade_req",to:id}); sentTo={id:id,name:nm}; setTimeout(function(){ if(sentTo&&sentTo.id===id){ sentTo=null; renderTr(); } },32000); renderTr(); return; }
+    if(a==="cancelReq"){ send({t:"trade_cancel"}); sentTo=null; renderTr(); return; }
+    if(a==="toggleSel"){ selOpen=!selOpen; renderTr(); return; }
+    if(a==="accept"){ if(!tr||el.disabled) return; send({t:"trade_accept",on:!tr.acc[myId]}); return; }
+    if(a==="cancelTrade"){ send({t:"trade_cancel"}); return; }
+    if(a==="step"){
+      var sec=el.getAttribute("data-sec"), key=el.getAttribute("data-key"), d=el.getAttribute("data-d");
+      var have=sec==="baits"?(baits[+key]?baits[+key].owned|0:0):sec==="mats"?(materials[key]|0):sec==="bag"?(bagItems[key]|0):(inventory[key]|0);
+      var cur=sel[sec][key]|0;
+      cur=d==="max"?have:Math.max(0,Math.min(have,cur+(+d)));
+      if(cur>0) sel[sec][key]=cur; else delete sel[sec][key];
+      pushOffer(); renderTr();
+    }
+  }
+  function onTrChange(e){
+    var t=e.target;
+    if(t.id==="trMoney"){ var v=Math.max(0,Math.min(Math.floor(Number(t.value)||0),Math.floor(money))); sel.money=v; pushOffer(); renderTr(); return; }
+    if(t.getAttribute&&t.getAttribute("data-sec")==="rods"){ var k=t.getAttribute("data-key"); if(t.checked) sel.rods[k]=true; else delete sel.rods[k]; pushOffer(); renderTr(); }
+  }
+  function tradeReset(){ tr=null; invIn=null; sentTo=null; sel=newSel(); selOpen=false; clearInterval(trTick); trTick=null; renderInv(); renderTr(); }
+  function applyTrade(m){
+    var mine=m.offers[myId], other=(m.a===myId)?m.b:m.a, theirs=m.offers[other];
+    if(!mine||!theirs) return;
+    var k,i;
+    // เอาของเราออก
+    money=Math.max(0,money-(mine.money|0));
+    mine.rods.forEach(function(id){ if(rods[id]){ rods[id].owned=false; if(rodEnchants) delete rodEnchants[id]; if(currentRod===id) currentRod=0; } });
+    for(k in mine.baits){ var b=baits[+k]; if(b){ b.owned=Math.max(0,(b.owned|0)-mine.baits[k]); if(currentBait===b.id&&b.owned<=0) currentBait=0; } }
+    for(k in mine.mats) materials[k]=Math.max(0,(materials[k]|0)-mine.mats[k]);
+    for(k in mine.bag) bagItems[k]=Math.max(0,(bagItems[k]|0)-mine.bag[k]);
+    for(k in mine.fish){ inventory[k]=(inventory[k]|0)-mine.fish[k]; if(inventory[k]<=0){ delete inventory[k]; delete fishEntry[k]; delete lockedFish[k]; } }
+    // รับของเพื่อน
+    money+=(theirs.money|0);
+    theirs.rods.forEach(function(id){ if(rods[id]){ rods[id].owned=true; if(theirs.enchants&&theirs.enchants[id]) rodEnchants[id]=theirs.enchants[id]; } });
+    for(k in theirs.baits) if(baits[+k]) baits[+k].owned=(baits[+k].owned|0)+theirs.baits[k];
+    for(k in theirs.mats) materials[k]=(materials[k]|0)+theirs.mats[k];
+    for(k in theirs.bag) bagItems[k]=(bagItems[k]|0)+theirs.bag[k];
+    for(k in theirs.fish){
+      inventory[k]=(inventory[k]|0)+theirs.fish[k];
+      var fi=(theirs.fishInfo&&theirs.fishInfo[k])||{}; if(!fishEntry[k]) fishEntry[k]={name:fi.name||String(k).split("@")[0],weight:fi.weight!=null?fi.weight:"?",price:fi.price|0,rarity:fi.rarity||"ธรรมดา"};
+    }
+    try{ saveGame(); }catch(e){}
+    try{ updateUI(); }catch(e){}
+    try{ draw(); }catch(e){}
+    try{ SFX.sell(); }catch(e){}
+    var gotTxt=summarize(theirs).replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
+    addLog('<div style="color:#a5d6a7">✅ '+T("แลกของกับ ","Traded with ")+esc(nameOf(other))+T(" สำเร็จ — ได้รับ: "," done — received: ")+esc(gotTxt)+'</div>',false);
+    if(typeof showMessage==="function") showMessage("✅ "+T("แลกของสำเร็จ!","Trade complete!"),2400);
+    tradeReset(); closeTrade();
+  }
+  function tradeOnMsg(m){
+    switch(m.t){
+      case "trade_inv":
+        if(tr) { send({t:"trade_res",from:m.from,ok:false}); break; }
+        invIn={from:m.from,name:m.name}; clearTimeout(invTimer); invTimer=setTimeout(function(){ invIn=null; renderInv(); },30000);
+        renderInv(); try{ SFX.click(); }catch(e){} break;
+      case "trade_sent": break;
+      case "trade_open":
+        tr={id:m.id,withId:m.with,withName:m.name,offers:{},acc:{},state:"open",endAt:0,cdKey:0};
+        sel=newSel(); selOpen=true; sentTo=null; invIn=null; renderInv(); openTrade();
+        if(!trTick) trTick=setInterval(function(){ if(tr&&tr.state==="countdown") renderTr(); },250);
+        break;
+      case "trade_state":
+        if(!tr||tr.id!==m.id) break;
+        tr.offers=m.offers||{}; tr.acc=m.acc||{}; tr.state=m.state;
+        if(m.state==="countdown"){ if(tr.cdKey!==m.cdEnd){ tr.cdKey=m.cdEnd; tr.endAt=Date.now()+4900; try{ SFX.click(); }catch(e){} } }
+        else { tr.endAt=0; tr.cdKey=0; }
+        renderTr(); break;
+      case "trade_go":
+        if(!tr) break;
+        var mine=tr.offers[myId], theirs=tr.offers[tr.withId], why=canGive(mine)||canReceive(theirs,mine);
+        send({t:"trade_ready",ok:!why,why:why}); break;
+      case "trade_done": applyTrade(m); break;
+      case "trade_end":
+        var r=m.reason, by=m.by||"";
+        var msgs={cancel:T(by+" ยกเลิกการแลก","Trade cancelled by "+by),declined:T(by+" ปฏิเสธการแลก",by+" declined"),leave:T(by+" ออกจากห้อง — ยกเลิกการแลก",by+" left — trade cancelled"),
+          busy_me:T("คุณกำลังแลกอยู่","You are already trading"),busy_other:T(by+" กำลังแลกกับคนอื่น",by+" is busy"),timeout:T("หมดเวลา ยกเลิกการแลก","Timed out"),verify_fail:T("แลกไม่สำเร็จ: "+by,"Trade failed: "+by)};
+        toast(msgs[r]||T("ยกเลิกการแลก","Trade ended"));
+        tr=null; sentTo=null; selOpen=false; sel=newSel(); clearInterval(trTick); trTick=null; renderTr(); break;
+    }
+  }
+
+  build(); buildTradeUI();
 })();
 </script>
 </body>

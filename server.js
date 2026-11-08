@@ -107,7 +107,7 @@ const int = (v, lo, hi, d) => { v = Math.floor(Number(v)); return Number.isFinit
 
 function roomList(room) {
   return [...room.players.values()].map(p => ({
-    id: p.id, name: p.name, loc: p.loc, level: p.level, score: p.score, catches: p.catches
+    id: p.id, name: p.name, loc: p.loc, level: p.level, score: p.score, catches: p.catches, st: p.st|0, hy: p.hy||55, rod: p.rod|0
   }));
 }
 function broadcast(room, obj, exceptId) {
@@ -115,8 +115,162 @@ function broadcast(room, obj, exceptId) {
 }
 function pushPlayers(room) { broadcast(room, { t: 'players', players: roomList(room) }); }
 
+// ---------- ระบบแลกของ (เซิร์ฟเวอร์เป็นตัวกลางนับเวลา + ยืนยันสองฝั่งก่อนสลับ) ----------
+const trades = new Map();      // tradeId -> trade
+const tradeOf = new Map();     // playerId -> trade
+const invites = new Map();     // toId -> { from, exp }
+let tradeSeq = 1;
+const TRADE_COUNTDOWN_MS = 5000;
+const TRADE_READY_TIMEOUT_MS = 6000;
+
+function cleanKey(k) { return String(k).replace(/[\u0000-\u001f<>]/g, '').slice(0, 60); }
+function cleanCounts(o, maxKeys) {
+  const out = {};
+  if (!o || typeof o !== 'object') return out;
+  let n = 0;
+  for (const k of Object.keys(o)) {
+    if (n >= maxKeys) break;
+    const v = Math.floor(Number(o[k]));
+    if (!Number.isFinite(v) || v < 1) continue;
+    out[cleanKey(k)] = Math.min(v, 1e9); n++;
+  }
+  return out;
+}
+function sanitizeOffer(o) {
+  o = o && typeof o === 'object' ? o : {};
+  const offer = { money: 0, rods: [], baits: {}, mats: {}, bag: {}, fish: {}, fishInfo: {}, enchants: {} };
+  const money = Math.floor(Number(o.money));
+  if (Number.isFinite(money) && money > 0) offer.money = Math.min(money, 1e13);
+  if (Array.isArray(o.rods)) {
+    const seen = new Set();
+    for (const r of o.rods.slice(0, 60)) { const id = int(r, 0, 999, -1); if (id >= 0 && !seen.has(id)) { seen.add(id); offer.rods.push(id); } }
+  }
+  offer.baits = cleanCounts(o.baits, 20);
+  offer.mats = cleanCounts(o.mats, 30);
+  offer.bag = cleanCounts(o.bag, 30);
+  offer.fish = cleanCounts(o.fish, 60);
+  for (const k of Object.keys(offer.fish)) {
+    const fi = o.fishInfo && o.fishInfo[k];
+    if (fi && typeof fi === 'object') {
+      offer.fishInfo[k] = {
+        name: cleanKey(fi.name || ''), weight: (typeof fi.weight === 'number') ? fi.weight : cleanKey(fi.weight || '?'),
+        price: int(fi.price, 0, 1e9, 0), rarity: cleanKey(fi.rarity || '')
+      };
+    }
+  }
+  if (o.enchants && typeof o.enchants === 'object') {
+    for (const id of offer.rods) {
+      const e = o.enchants[id];
+      if (e && typeof e === 'object') { try { const j = JSON.stringify(e); if (j.length < 400) offer.enchants[id] = JSON.parse(j); } catch (e2) {} }
+    }
+  }
+  return offer;
+}
+function findPlayer(room, id) {
+  for (const pl of room.players.values()) if (String(pl.id) === String(id)) return pl;
+  return null;
+}
+function tradeState(t, extra) {
+  return Object.assign({ t: 'trade_state', id: t.id, offers: t.offers, acc: t.acc, state: t.state, cdEnd: t.cdEnd || 0 }, extra || {});
+}
+function tradeSend(t, room, obj) {
+  for (const id of [t.a, t.b]) { const pl = findPlayer(room, id); if (pl) wsSend(pl.sock, obj); }
+}
+function endTrade(t, room, reason, byName) {
+  if (!trades.has(t.id)) return;
+  clearTimeout(t.timer); clearTimeout(t.readyTimer);
+  trades.delete(t.id); tradeOf.delete(t.a); tradeOf.delete(t.b);
+  if (room) tradeSend(t, room, { t: 'trade_end', id: t.id, reason, by: byName || '' });
+}
+function cancelTradesOf(player, reason) {
+  const room = player.room && rooms.get(player.room);
+  invites.delete(player.id);
+  for (const [k, v] of invites) if (v.from === player.id) invites.delete(k);
+  const t = tradeOf.get(player.id);
+  if (t) endTrade(t, room, reason || 'leave', player.name);
+}
+function tradeMsg(p, room, m) {
+  const now = Date.now();
+  switch (m.t) {
+    case 'trade_req': {
+      const to = findPlayer(room, String(m.to || ''));
+      if (!to || to.id === p.id) return;
+      if (tradeOf.has(p.id)) return wsSend(p.sock, { t: 'trade_end', reason: 'busy_me' });
+      if (tradeOf.has(to.id)) return wsSend(p.sock, { t: 'trade_end', reason: 'busy_other', by: to.name });
+      invites.set(to.id, { from: p.id, exp: now + 30000 });
+      wsSend(to.sock, { t: 'trade_inv', from: p.id, name: p.name });
+      wsSend(p.sock, { t: 'trade_sent', to: to.id, name: to.name });
+      break;
+    }
+    case 'trade_res': {
+      const inv = invites.get(p.id);
+      const from = findPlayer(room, String(m.from || ''));
+      if (!inv || !from || inv.from !== from.id || inv.exp < now) return;
+      invites.delete(p.id);
+      if (!m.ok) return wsSend(from.sock, { t: 'trade_end', reason: 'declined', by: p.name });
+      if (tradeOf.has(p.id) || tradeOf.has(from.id)) return wsSend(from.sock, { t: 'trade_end', reason: 'busy_other', by: p.name });
+      const t = { id: 'T' + (tradeSeq++), a: from.id, b: p.id, offers: {}, acc: {}, state: 'open', timer: null, readyTimer: null, ready: {}, cdEnd: 0 };
+      t.offers[t.a] = sanitizeOffer({}); t.offers[t.b] = sanitizeOffer({});
+      t.acc[t.a] = false; t.acc[t.b] = false;
+      trades.set(t.id, t); tradeOf.set(t.a, t); tradeOf.set(t.b, t);
+      wsSend(from.sock, { t: 'trade_open', id: t.id, with: p.id, name: p.name });
+      wsSend(p.sock, { t: 'trade_open', id: t.id, with: from.id, name: from.name });
+      tradeSend(t, room, tradeState(t));
+      break;
+    }
+    case 'trade_offer': {
+      const t = tradeOf.get(p.id);
+      if (!t || t.state !== 'open') return;
+      t.offers[p.id] = sanitizeOffer(m.offer);
+      t.acc[t.a] = false; t.acc[t.b] = false;
+      tradeSend(t, room, tradeState(t));
+      break;
+    }
+    case 'trade_accept': {
+      const t = tradeOf.get(p.id);
+      if (!t || t.state !== 'open') return;
+      t.acc[p.id] = !!m.on;
+      if (t.acc[t.a] && t.acc[t.b]) {
+        t.state = 'countdown'; t.cdEnd = now + TRADE_COUNTDOWN_MS;
+        t.timer = setTimeout(() => {
+          if (!trades.has(t.id)) return;
+          t.state = 'verify'; t.ready = {};
+          tradeSend(t, room, { t: 'trade_go', id: t.id });
+          t.readyTimer = setTimeout(() => endTrade(t, room, 'timeout'), TRADE_READY_TIMEOUT_MS);
+        }, TRADE_COUNTDOWN_MS);
+      }
+      tradeSend(t, room, tradeState(t));
+      break;
+    }
+    case 'trade_ready': {
+      const t = tradeOf.get(p.id);
+      if (!t || t.state !== 'verify') return;
+      if (!m.ok) return endTrade(t, room, 'verify_fail', p.name + (m.why ? ': ' + cleanKey(m.why) : ''));
+      t.ready[p.id] = true;
+      if (t.ready[t.a] && t.ready[t.b]) {
+        const done = { t: 'trade_done', id: t.id, offers: t.offers, a: t.a, b: t.b };
+        clearTimeout(t.readyTimer);
+        trades.delete(t.id); tradeOf.delete(t.a); tradeOf.delete(t.b);
+        tradeSend(t, room, done);
+      }
+      break;
+    }
+    case 'trade_cancel': {
+      const t = tradeOf.get(p.id);
+      if (t) return endTrade(t, room, 'cancel', p.name);
+      for (const [k, v] of invites) if (v.from === p.id || k === p.id) {
+        invites.delete(k);
+        const other = findPlayer(room, v.from === p.id ? k : v.from);
+        if (other) wsSend(other.sock, { t: 'trade_end', reason: 'cancel', by: p.name });
+      }
+      break;
+    }
+  }
+}
+
 function leaveRoom(player) {
   const room = player.room && rooms.get(player.room);
+  try { cancelTradesOf(player, 'leave'); } catch (e) {}
   player.room = null;
   if (!room) return;
   room.players.delete(player.id);
@@ -151,6 +305,7 @@ function handleMessage(p, m) {
   const room = p.room && rooms.get(p.room);
   if (!room) return;
   const now = Date.now();
+  if (typeof m.t === 'string' && m.t.startsWith('trade_')) { tradeMsg(p, room, m); return; }
   switch (m.t) {
     case 'pos': {
       p.bx = int(m.bx, 0, 360, p.bx);
@@ -158,7 +313,8 @@ function handleMessage(p, m) {
       const level = int(m.level, 1, 9999, p.level);
       const changed = loc !== p.loc || level !== p.level;
       p.loc = loc; p.level = level;
-      broadcast(room, { t: 'pos', id: p.id, bx: p.bx, loc: p.loc }, p.id);
+      p.st = int(m.st, 0, 6, 0); p.hy = int(m.hy, 0, 400, 55); p.rod = int(m.rod, 0, 99, 0);
+      broadcast(room, { t: 'pos', id: p.id, bx: p.bx, loc: p.loc, st: p.st, hy: p.hy, rod: p.rod }, p.id);
       if (changed) pushPlayers(room);
       break;
     }
