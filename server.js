@@ -278,6 +278,34 @@ function leaveRoom(player) {
   else { pushPlayers(room); broadcast(room, { t: 'sys', text: player.name + ' ออกจากห้อง' }); }
 }
 
+// ===== ระบบแอดมิน (ตรวจรหัสที่เซิร์ฟเวอร์) =====
+// ตั้งรหัสเองได้ใน Render: Environment → ADMIN_KEY  (ถ้าไม่ตั้งจะใช้ค่าเริ่มต้นด้านล่าง)
+const ADMIN_KEY = process.env.ADMIN_KEY || 'ADMID-9731';
+function adminMsg(p, room, m) {
+  const now = Date.now();
+  if (m.t === 'admin_auth') {
+    if ((p.adminLockUntil || 0) > now) { wsSend(p.sock, { t: 'admin_res', ok: false, why: 'wait' }); return; }
+    if (String(m.key || '') === ADMIN_KEY) { p.admin = true; p.adminFails = 0; wsSend(p.sock, { t: 'admin_res', ok: true, what: 'auth' }); }
+    else {
+      p.adminFails = (p.adminFails || 0) + 1;
+      if (p.adminFails >= 5) { p.adminLockUntil = now + 60000; p.adminFails = 0; }
+      wsSend(p.sock, { t: 'admin_res', ok: false, why: 'badkey' });
+    }
+    return;
+  }
+  if (!p.admin) { wsSend(p.sock, { t: 'admin_res', ok: false, why: 'noauth' }); return; }
+  const to = findPlayer(room, String(m.to || ''));
+  if (!to) { wsSend(p.sock, { t: 'admin_res', ok: false, why: 'noplayer' }); return; }
+  if (m.t === 'admin_send') {
+    wsSend(to.sock, { t: 'admin_send', loc: int(m.loc, 0, 14, 0), by: p.name });
+    wsSend(p.sock, { t: 'admin_res', ok: true, what: 'send', name: to.name });
+  } else if (m.t === 'admin_give') {
+    const kind = ['money', 'rod', 'bait', 'mat', 'bag', 'level', 'god'].indexOf(m.kind) >= 0 ? m.kind : null;
+    if (!kind) return;
+    wsSend(to.sock, { t: 'admin_give', kind, id: cleanKey(m.id == null ? '' : m.id), qty: Math.floor(Math.min(1e12, Math.max(1, Number(m.qty) || 1))), by: p.name });
+    wsSend(p.sock, { t: 'admin_res', ok: true, what: 'give', name: to.name });
+  }
+}
 function handleMessage(p, m) {
   if (m.t === 'join') {
     const code = cleanCode(m.room);
@@ -306,6 +334,7 @@ function handleMessage(p, m) {
   if (!room) return;
   const now = Date.now();
   if (typeof m.t === 'string' && m.t.startsWith('trade_')) { tradeMsg(p, room, m); return; }
+  if (typeof m.t === 'string' && m.t.startsWith('admin_')) { adminMsg(p, room, m); return; }
   switch (m.t) {
     case 'pos': {
       p.bx = int(m.bx, 0, 360, p.bx);

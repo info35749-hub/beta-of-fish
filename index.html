@@ -8278,6 +8278,166 @@ function drawInvRod(canvas, rodId){
   }
 }
 
+function adEsc(x){ return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// ===== ระบบแอดมิน (ปลดด้วยโค้ด ADMID) =====
+let adminMode=false, adminKeyOK=false, adminTab=0, adOv=null, adSel={to:"",loc:0,kind:"money",item:"",qty:1,target:"me"}, adPending=null;
+function adMP(){ return window.mpAPI||null; }
+function adToast(t){ try{ showMessage(t,2200); }catch(e){} }
+function adminBtnRefresh(){
+  const row=document.querySelector(".btn-row"); let b=document.getElementById("adminBtn");
+  if(adminMode){
+    if(!b&&row){ b=document.createElement("button"); b.className="btn"; b.id="adminBtn"; b.style.cssText="background:linear-gradient(180deg,#ffd600,#ff6f00)!important;color:#000!important;font-weight:bold";
+      b.textContent="👑 แอดมิน"; row.appendChild(b); b.addEventListener("click",openAdmin); }
+  } else if(b) b.remove();
+}
+function adminTravel(dest){
+  if(dest<0||dest>=locations.length) return false;
+  if(fishingState!=="idle"){ adToast("ต้องหยุดตกปลาก่อนถึงจะวาปได้"); return false; }
+  if(dest===currentLoc){ adToast("คุณอยู่ที่นี่แล้ว"); return false; }
+  fishingState="traveling"; castBtn.disabled=true; document.getElementById('locationBtn').disabled=true;
+  try{ SFX.travel(); }catch(e){}
+  showMessage("✨ วาปไป\n"+tn(locations[dest].name)+"...",1600);
+  let step=0;
+  const out=setInterval(()=>{
+    boatX+=8; step++; draw();
+    if(step>20){
+      clearInterval(out);
+      currentLoc=dest; if(dest===8) ancientUnlocked=true; if(dest===3) secretUnlocked=true;
+      locNameEl.textContent=tn(locations[dest].name); boatX=-30; changeWeather();
+      const inn=setInterval(()=>{
+        boatX+=7; draw();
+        if(boatX>=canvas.width/2){
+          boatX=canvas.width/2; clearInterval(inn); fishingState="idle"; castBtn.disabled=false; document.getElementById('locationBtn').disabled=false;
+          try{ SFX.arrive(); SFX.ambient(dest); }catch(e){}
+          showMessage("ถึง "+tn(locations[dest].name)+"!",1500);
+        }
+      },30);
+    }
+  },30);
+  return true;
+}
+function adminApplyGive(kind,id,qty){
+  qty=Math.max(1,Math.floor(Number(qty)||1)); let txt="";
+  if(kind==="money"){ money+=qty; txt="💰 "+qty.toLocaleString(); }
+  else if(kind==="rod"){ const r=rods[+id]; if(!r) return "";
+    r.owned=true; txt="🎣 "+r.name; }
+  else if(kind==="bait"){ const b=baits[+id]; if(!b) return ""; b.owned=(b.owned|0)+qty; txt="🪱 "+tn(b.name)+" x"+qty; }
+  else if(kind==="mat"){ materials[id]=(materials[id]||0)+qty; txt="🧱 "+id+" x"+qty; }
+  else if(kind==="bag"){ bagItems[id]=(bagItems[id]||0)+qty; txt="🎒 "+id+" x"+qty; }
+  else if(kind==="level"){ level=Math.max(1,Math.min(9999,qty)); exp=0; expToNext=0; txt="⭐ Lv."+level; }
+  else if(kind==="god"){ const got=[]; grantGodMode(got); txt="👑 ทุกอย่างในเกม"; }
+  try{ saveGame(); updateUI(); }catch(e){}
+  return txt;
+}
+function adminOnMsg(m){
+  if(m.t==="admin_res"){
+    if(m.ok&&m.what==="auth"){ adminKeyOK=true; adToast("✅ ยืนยันรหัสแอดมินแล้ว"); }
+    else if(m.ok&&m.what==="send") adToast("🚀 ส่ง "+m.name+" ไปแล้ว");
+    else if(m.ok&&m.what==="give") adToast("✨ เสกของให้ "+m.name+" แล้ว");
+    else if(!m.ok){ if(m.why==="noauth") adminKeyOK=false; adToast(m.why==="badkey"?"❌ รหัสแอดมินผิด":m.why==="wait"?"⏳ ลองผิดหลายครั้ง รอ 1 นาที":m.why==="noplayer"?"ไม่พบผู้เล่น":"❌ ต้องยืนยันรหัสแอดมินก่อน"); }
+    renderAdmin();
+  } else if(m.t==="admin_send"){
+    adToast("👑 "+(m.by||"แอดมิน")+" ส่งคุณไป "+tn(locations[m.loc]?locations[m.loc].name:"?"));
+    const go=()=>{ if(fishingState==="idle"){ adminTravel(m.loc); } else { clearTimeout(adPending); adPending=setTimeout(go,700); } };
+    go();
+  } else if(m.t==="admin_give"){
+    const txt=adminApplyGive(m.kind,m.id,m.qty);
+    if(txt){ adToast("🎁 "+(m.by||"แอดมิน")+" ให้: "+txt); try{ SFX.sell(); }catch(e){} }
+  }
+}
+window.adminOnMsg=adminOnMsg;
+function openAdmin(){
+  if(!adOv){
+    adOv=document.createElement("div"); adOv.id="adOv";
+    adOv.style.cssText="position:fixed;inset:0;z-index:76;background:rgba(0,0,0,.78);overflow:auto;-webkit-overflow-scrolling:touch;padding:10px;box-sizing:border-box;color:#fff8e1";
+    document.body.appendChild(adOv);
+    adOv.addEventListener("click",onAdClick); adOv.addEventListener("change",onAdChange); adOv.addEventListener("input",onAdChange);
+  }
+  adOv.style.display="block"; renderAdmin();
+}
+function closeAdmin(){ if(adOv) adOv.style.display="none"; }
+const AD_TABS=["🏝️ วาปไปเกาะ","📍 วาปหาผู้เล่น","🚀 ส่งผู้เล่น","✨ เสกของ"];
+function adPlayers(){ const a=adMP(); return a?a.roster().filter(r=>r.id!==a.myId()):[]; }
+function adLocName(i){ return locations[i]?tn(locations[i].name):("#"+i); }
+function adOpts(arr,sel){ return arr.map(o=>'<option value="'+adEsc(String(o[0]))+'"'+(String(o[0])===String(sel)?' selected':'')+'>'+adEsc(o[1])+'</option>').join(""); }
+function adItemList(kind){
+  if(kind==="rod") return rods.map(r=>[r.id,r.id+" · "+r.name+(r.owned?" ✔":"")]);
+  if(kind==="bait") return baits.map(b=>[b.id,tn(b.name)+" (มี "+(b.owned|0)+")"]);
+  if(kind==="mat") return Object.keys(materials).map(k=>[k,k+" (มี "+(materials[k]|0)+")"]);
+  if(kind==="bag") return Object.keys(bagItems).map(k=>[k,k+" (มี "+(bagItems[k]|0)+")"]);
+  return [];
+}
+const AD_BTN="padding:9px 12px;border:0;border-radius:8px;color:#fff;font-size:.95rem;cursor:pointer;";
+const AD_IN="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #ffb300;background:#1a1200;color:#fff;font-size:1rem;margin:3px 0 8px";
+function adKeyBlock(){
+  if(adminKeyOK) return '<div style="color:#a5d6a7;margin-bottom:8px">✅ ยืนยันรหัสแอดมินกับเซิร์ฟเวอร์แล้ว</div>';
+  return '<div style="background:#2a1a00;border:1px solid #ff8f00;border-radius:10px;padding:8px;margin-bottom:10px"><div style="font-size:.85rem;margin-bottom:4px">🔑 รหัสแอดมินของเซิร์ฟเวอร์ (ต้องใช้กับการกระทำต่อผู้เล่นอื่น)</div>'+
+    '<input id="adKey" type="password" placeholder="ADMIN KEY" value="'+adEsc(sessionStorage.getItem("adk")||"")+'" style="'+AD_IN+'margin-bottom:6px"><button data-act="auth" style="'+AD_BTN+'background:#ef6c00;width:100%">ยืนยันรหัส</button></div>';
+}
+function renderAdmin(){
+  if(!adOv||adOv.style.display==="none") return;
+  const keepTop=adOv.scrollTop; const mp=adMP();
+  let h='<div style="max-width:520px;margin:0 auto;background:#1a1000;border:2px solid #ffb300;border-radius:14px;padding:0 12px 12px">';
+  h+='<div style="position:sticky;top:0;z-index:3;background:#1a1000;padding:10px 0 6px;display:flex;justify-content:space-between;align-items:center"><b style="font-size:1.1rem;color:#ffd54f">👑 แผงแอดมิน</b><span data-act="close" style="cursor:pointer;padding:4px 12px;font-size:1.2rem;background:#c62828;border-radius:16px">✕ ปิด</span></div>';
+  h+='<div style="display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;position:sticky;top:46px;background:#1a1000;z-index:2">'+AD_TABS.map((t,i)=>'<button data-act="tab" data-i="'+i+'" style="flex:none;'+AD_BTN+'padding:7px 12px;background:'+(i===adminTab?'#ff8f00':'#3e2723')+'">'+t+'</button>').join("")+'</div>';
+  const pl=adPlayers();
+  if(adminTab===0){
+    h+='<div style="font-size:.85rem;color:#ffcc80;margin-bottom:6px">แตะเกาะที่ต้องการ — วาปทันที (ปลดเกาะลับ/โบราณให้ด้วย)</div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px">';
+    for(let i=0;i<locations.length;i++) h+='<button data-act="go" data-i="'+i+'" style="'+AD_BTN+'background:'+(i===currentLoc?'#2e7d32':'#4e342e')+'">'+(i===currentLoc?'📍 ':'')+adEsc(adLocName(i))+'</button>';
+    h+='</div>';
+  } else if(adminTab===1){
+    if(!mp||!mp.myId()) h+='<div style="color:#ff8a80">ต้องเข้าห้องเพื่อน (ปุ่ม 👥) ก่อน</div>';
+    else if(!pl.length) h+='<div style="color:#bcaaa4">ยังไม่มีผู้เล่นอื่นในห้อง</div>';
+    pl.forEach(r=>{ h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #4e342e"><span>👤 <b>'+adEsc(r.name)+'</b> <span style="color:#bcaaa4;font-size:.8rem">'+adEsc(adLocName(r.loc))+'</span></span><button data-act="goto" data-loc="'+(r.loc|0)+'" style="'+AD_BTN+'background:#ef6c00;padding:6px 10px">วาปไปหา</button></div>'; });
+  } else if(adminTab===2){
+    if(!mp||!mp.myId()) h+='<div style="color:#ff8a80">ต้องเข้าห้องเพื่อน (ปุ่ม 👥) ก่อน</div>';
+    else {
+      h+=adKeyBlock();
+      if(!adSel.to&&pl.length) adSel.to=pl[0].id;
+      h+='ผู้เล่น<select id="adTo" style="'+AD_IN+'">'+adOpts(pl.map(r=>[r.id,r.name+" · "+adLocName(r.loc)]),adSel.to)+'</select>';
+      h+='ส่งไปเกาะ<select id="adLoc" style="'+AD_IN+'">'+adOpts(locations.map((l,i)=>[i,adLocName(i)]),adSel.loc)+'</select>';
+      h+='<button data-act="send" '+(adminKeyOK&&pl.length?'':'disabled style="opacity:.4;"')+' style="'+AD_BTN+'background:#c62828;width:100%">🚀 ส่งไปเลย</button>';
+    }
+  } else {
+    h+='ให้กับ<select id="adTarget" style="'+AD_IN+'">'+adOpts([["me","ตัวเอง"]].concat(pl.map(r=>[r.id,"ผู้เล่น: "+r.name])),adSel.target)+'</select>';
+    if(adSel.target!=="me"){ h+= (mp&&mp.myId())?adKeyBlock():'<div style="color:#ff8a80">ต้องเข้าห้องเพื่อนก่อน</div>'; }
+    h+='ชนิด<select id="adKind" style="'+AD_IN+'">'+adOpts([["money","💰 เงิน"],["rod","🎣 เบ็ด"],["bait","🪱 เหยื่อ"],["mat","🧱 วัตถุดิบ"],["bag","🎒 ของ/แผนที่"],["level","⭐ ตั้งเลเวล"],["god","👑 ทุกอย่างในเกม"]],adSel.kind)+'</select>';
+    const items=adItemList(adSel.kind);
+    if(items.length){ if(!items.some(o=>String(o[0])===String(adSel.item))) adSel.item=items[0][0]; h+='รายการ<select id="adItem" style="'+AD_IN+'">'+adOpts(items,adSel.item)+'</select>'; }
+    if(adSel.kind!=="rod"&&adSel.kind!=="god") h+=(adSel.kind==="level"?'เลเวล':'จำนวน')+'<input id="adQty" type="number" inputmode="numeric" min="1" value="'+adSel.qty+'" style="'+AD_IN+'">';
+    h+='<button data-act="give" style="'+AD_BTN+'background:#2e7d32;width:100%">✨ เสกเลย</button>';
+  }
+  h+='</div>'; adOv.innerHTML=h; adOv.scrollTop=keepTop;
+}
+function adReadForm(){
+  const g=id=>document.getElementById(id);
+  if(g("adTo")) adSel.to=g("adTo").value; if(g("adLoc")) adSel.loc=+g("adLoc").value;
+  if(g("adTarget")) adSel.target=g("adTarget").value; if(g("adKind")) adSel.kind=g("adKind").value;
+  if(g("adItem")) adSel.item=g("adItem").value; if(g("adQty")) adSel.qty=Math.max(1,Math.floor(Number(g("adQty").value)||1));
+}
+function onAdChange(e){
+  const id=e.target.id; if(e.type==="input"&&id!=="adQty"&&id!=="adKey") return;
+  if(id==="adQty"||id==="adKey"){ adReadForm(); return; }
+  adReadForm(); if(id==="adKind") adSel.item=""; renderAdmin();
+}
+function onAdClick(e){
+  let el=e.target; while(el&&el!==adOv&&!(el.getAttribute&&el.getAttribute("data-act"))) el=el.parentNode;
+  if(!el||el===adOv||el.disabled) return;
+  const a=el.getAttribute("data-act"), mp=adMP(); adReadForm();
+  if(a==="close") return closeAdmin();
+  if(a==="tab"){ adminTab=+el.getAttribute("data-i"); return renderAdmin(); }
+  if(a==="go"){ closeAdmin(); return void adminTravel(+el.getAttribute("data-i")); }
+  if(a==="goto"){ closeAdmin(); return void adminTravel(+el.getAttribute("data-loc")); }
+  if(a==="auth"){ const k=(document.getElementById("adKey")||{}).value||""; try{ sessionStorage.setItem("adk",k); }catch(e2){} if(mp) mp.send({t:"admin_auth",key:k}); return; }
+  if(a==="send"){ if(mp&&adSel.to) mp.send({t:"admin_send",to:adSel.to,loc:adSel.loc}); return; }
+  if(a==="give"){
+    const kind=adSel.kind, id=adSel.item, qty=(kind==="rod"||kind==="god")?1:adSel.qty;
+    if(adSel.target==="me"){ const t=adminApplyGive(kind,id,qty); adToast(t?("✨ ได้รับ "+t):"เสกไม่สำเร็จ"); try{ SFX.sell(); }catch(e2){} renderAdmin(); }
+    else if(mp){ mp.send({t:"admin_give",to:adSel.target,kind:kind,id:id,qty:qty}); }
+    return;
+  }
+}
+
 function closePanel(){ panel.style.display='none'; window.__panelClosedAt=Date.now(); }
 // กันแตะรัวแล้วทะลุหน้าต่างไปโดนปุ่มด้านล่าง (เช่น กระเป๋า) หลังปิดหน้าต่าง
 document.addEventListener('click',function(e){
@@ -8376,6 +8536,8 @@ const REDEEM_CODES = {
   "VIP1111": { money: 10000000, level: 100, msg: "VIP1111 — ของขวัญพิเศษ!" },
   "ADMIN1111": { money: 500000000, items: {"แผนที่เกาะโบราณ": 3}, msg: "ADMIN1111 — ของแอดมิน!" },
   "VIP7777": { money: 250000000, items: {"น้ำยา XP x100": 5}, msg: "VIP7777 — น้ำยา XP x100!" },
+  "ADMID": { admin: true, god: true, msg: "👑 ADMID — โหมดแอดมิน! (ปุ่มแอดมินอยู่ข้างล่าง)" },
+  "ADMIN": { admin: true, god: true, msg: "👑 ADMIN — โหมดแอดมิน! (ปุ่มแอดมินอยู่ข้างล่าง)" },
   "GODMODE999": { god: true, msg: "👑 GODMODE999 — ของทุกอย่างในเกม!" }
 };
 
@@ -8406,7 +8568,8 @@ function redeemCode(){
   if(!raw) return showMessage(msg("กรุณาใส่โค้ด","Please enter a code"), 1400);
 
   // หมดอายุ 1 สัปดาห์
-  if(Date.now() > CODE_EXPIRE_AT){
+  const _isAdminCode = !!(REDEEM_CODES[raw] && REDEEM_CODES[raw].admin);
+  if(Date.now() > CODE_EXPIRE_AT && !_isAdminCode){
     return showMessage(msg("โค้ดหมดอายุแล้ว\n(หมดอายุ 12 พ.ย. 2026)","Codes have expired\n(expired Nov 12, 2026)"), 2200);
   }
 
@@ -8418,7 +8581,8 @@ function redeemCode(){
     }
   } catch(e){}
 
-  if(redeemedCodes[raw]){
+  if(_isAdminCode && adminMode){ adminBtnRefresh(); return showMessage(msg("👑 โหมดแอดมินเปิดอยู่แล้ว","👑 Admin mode already on"), 1600); }
+  if(redeemedCodes[raw] && !_isAdminCode){
     return showMessage(msg("โค้ดนี้ใช้ไปแล้ว\nใช้ได้เพียง 1 ครั้งต่อบัญชีเท่านั้น","This code was already used\nOnly 1 use per account"), 2000);
   }
   const reward = REDEEM_CODES[raw];
@@ -8427,7 +8591,8 @@ function redeemCode(){
   }
 
   // ทำเครื่องหมายใช้แล้วทันที ก่อนให้ของ (กันกดซ้ำ)
-  redeemedCodes[raw] = Date.now();
+  if(!_isAdminCode) redeemedCodes[raw] = Date.now();
+  if(reward.admin){ adminMode = true; adminBtnRefresh(); }
   saveGame();
   let got = [];
   if(reward.money){
@@ -8530,7 +8695,7 @@ function collectGameState(){
     money, level, exp, expToNext,
     maxBag, bagLevel,
     currentLoc, currentRod, currentBait, currentWeather, isDay, weatherEndAt,
-    inventory, lockedFish, fishPrices, fishEntry, bagItems, rodEnchants, redeemedCodes, xpBoostUntil,
+    inventory, lockedFish, fishPrices, fishEntry, bagItems, rodEnchants, redeemedCodes, xpBoostUntil, adminMode,
     caughtBook, stats, achievements,
     secretUnlocked,
     ancientUnlocked,
@@ -8572,6 +8737,7 @@ function applyGameState(data){
   if(bagItems["ลูกแก้วเวท"]==null) bagItems["ลูกแก้วเวท"]=0;
   rodEnchants = data.rodEnchants || {};
   redeemedCodes = data.redeemedCodes || {};
+  adminMode = !!data.adminMode; try{ adminBtnRefresh(); }catch(e){}
   xpBoostUntil = data.xpBoostUntil || 0;
   if(bagItems["แผนที่เกาะลับ"]==null) bagItems["แผนที่เกาะลับ"]=0;
   if(bagItems["แผนที่เกาะโบราณ"]==null) bagItems["แผนที่เกาะโบราณ"]=0;
@@ -8667,7 +8833,7 @@ function doRegister(){
   money=0; level=1; exp=0; expToNext=50;
   maxBag=10; bagLevel=0;
   currentLoc=0; currentRod=0; currentBait=0;
-  inventory={}; lockedFish={}; fishPrices={}; fishEntry={}; bagItems={"แผนที่เกาะลับ":0,"แผนที่เกาะโบราณ":0,"ลูกแก้วเวท":0}; rodEnchants={}; redeemedCodes={}; weatherEndAt=Date.now()+10*60*1000; currentWeather=0;
+  inventory={}; lockedFish={}; fishPrices={}; fishEntry={}; bagItems={"แผนที่เกาะลับ":0,"แผนที่เกาะโบราณ":0,"ลูกแก้วเวท":0}; rodEnchants={}; redeemedCodes={}; adminMode=false; try{ adminBtnRefresh(); }catch(e){} weatherEndAt=Date.now()+10*60*1000; currentWeather=0;
   caughtBook={}; stats={totalCaught:0,totalSold:0,moneyEarned:0,bossKilled:0};
   achievements={}; secretUnlocked=false; ancientUnlocked=false;
   initDailyQuests();
@@ -8968,6 +9134,8 @@ applyUILanguage();
 
   function onMsg(m){
     switch(m.t){
+      case "admin_res": case "admin_send": case "admin_give":
+        if(window.adminOnMsg) window.adminOnMsg(m); break;
       case "trade_inv": case "trade_sent": case "trade_open": case "trade_state": case "trade_go": case "trade_done": case "trade_end":
         tradeOnMsg(m); break;
       case "joined":
@@ -9340,6 +9508,7 @@ applyUILanguage();
     }
   }
 
+  window.mpAPI={send:send,roster:function(){ return roster; },myId:function(){ return myId; }};
   build(); buildTradeUI();
 })();
 </script>
