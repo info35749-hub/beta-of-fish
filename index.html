@@ -3289,11 +3289,211 @@ function pfxAdd(p){
   PFX.list.push(p);
   pfxKick();
 }
+// ===== ภาพปลาวาดเอง + แอนิเมชันดึงปลาขึ้นจากน้ำ (เห็นทั้งตัวเองและเพื่อน) =====
+var FISHANIM = [];
+var FA_RC = {"ธรรมดา":null,"หายาก":"#4fc3f7","มหากาพย์":"#ce93d8","ตำนาน":"#ffd54f","บอส":"#ff5252"};
+var FA_SCALE = {"ธรรมดา":1,"หายาก":1.12,"มหากาพย์":1.28,"ตำนาน":1.5,"บอส":1.9};
+var _faCache = {};
+function faHash(s){ var h=2166136261>>>0; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h>>>0; }
+function faRng(seed){ var a=seed>>>0; return function(){ a=(a+0x6D2B79F5)>>>0; var t=a; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
+function faInfo(name, rarity){
+  var k=name+"|"+rarity; if(_faCache[k]) return _faCache[k];
+  var R=faRng(faHash(name)), n=name, kind="fish";
+  if(/มังกร|พญานาค|ปลานาค/.test(n)) kind="dragon";
+  else if(/ฉลาม|เมกาโลดอน/.test(n)) kind="shark";
+  else if(/หมึก|คราเคน/.test(n)) kind="squid";
+  else if(/แมงกะพรุน/.test(n)) kind="jelly";
+  else if(/ไหล/.test(n)) kind="eel";
+  else if(/ฟีนิกซ์|วิหค/.test(n)) kind="bird";
+  var hue=Math.floor(R()*360), sat=60+R()*30, lit=50+R()*10, rainbow=false, dark=false, glass=false;
+  if(/ไฟ|ลาวา|อาทิตย์|ภูเขาไฟ|เถ้า|ซาก|มักมะ|นรก/.test(n)){ hue=8+R()*25; sat=90; lit=52; }
+  else if(/น้ำแข็ง|หิมะ|ขั้ว|เมฆ|ใส/.test(n)){ hue=190+R()*20; sat=70; lit=72; }
+  else if(/ทอง|ศร|เหรียญ/.test(n)){ hue=44; sat=95; lit=55; }
+  else if(/ม่วง|อเมทิสต์|มิติ|ปริศนา|อวกาศ|ความว่าง|ว่างเปล่า|เวิ้งว้าง/.test(n)){ hue=270+R()*25; sat=70; lit=55; }
+  else if(/เขียว|มรกต|บึง|ใบไม้|ใบไผ่/.test(n)){ hue=135+R()*20; sat=65; lit=46; }
+  else if(/ทราย|หิน|ศิลา|โบราณ|ตะกอน|ขุ่น|รูปปั้น|รูปเคารพ/.test(n)){ hue=32+R()*12; sat=35; lit=52; }
+  else if(/แดง|ราสเบอร์รี่|ปะการัง|การ์ตูน/.test(n)){ hue=(R()<0.5?3:18); sat=85; lit=55; }
+  else if(/น้ำเงิน|ไพลิน|ทะเลลึก|น้ำลึก/.test(n)){ hue=215+R()*15; sat=75; lit=50; }
+  if(kind==="shark" && !/ไฟ|ลาวา|น้ำแข็ง|หิมะ|รุ้ง|เงา|ทราย|หิน|เมฆ/.test(n)){ hue=205+R()*15; sat=22; lit=48; }
+  if(/เงา|ดำ|มืด|ออบซิเดียน|ไร้แสง|อบายส์/.test(n)){ dark=true; hue=250+R()*30; sat=30; lit=24; }
+  if(/รุ้ง|ปริซึม|เจ็ดสี|สีสัน|สวยงาม/.test(n)) rainbow=true;
+  if(/คริสตัล|แก้ว|โอปอล|โมรา|ใส/.test(n)) glass=true;
+  if(/เรือง|นีออน|แสง|โคม|สายฟ้า/.test(n)){ hue=170+R()*40; sat=95; lit=60; }
+  var info={kind:kind,hue:hue,sat:sat,lit:lit,rainbow:rainbow,dark:dark,glass:glass,
+    style:Math.floor(R()*4), pat:Math.floor(R()*4), pcol:(hue+150+R()*60)%360, fin:R(), horn:R(), seed:R()};
+  _faCache[k]=info; return info;
+}
+function faCol(i,a,l,al){ return "hsla("+Math.round(i.hue+(a||0))+","+Math.round(i.sat)+"%,"+Math.round(Math.max(6,Math.min(92,i.lit+(l||0))))+"%,"+(al==null?1:al)+")"; }
+// วาดปลาหันขวา ความยาว L กึ่งกลางที่ 0,0 ; t = เวลา (วินาที) สำหรับโบกหาง
+function drawFishArt(c, name, rarity, L, t){
+  var I=faInfo(name,rarity), sw=Math.sin(t*11), ink="rgba(0,0,0,0.45)";
+  c.save(); c.lineJoin="round"; c.lineCap="round";
+  var bodyG=function(H){ var g=c.createLinearGradient(0,-H,0,H);
+    if(I.rainbow){ g.addColorStop(0,"#ff5252"); g.addColorStop(0.25,"#ffd740"); g.addColorStop(0.5,"#69f0ae"); g.addColorStop(0.75,"#40c4ff"); g.addColorStop(1,"#b388ff"); }
+    else { g.addColorStop(0,faCol(I,0,-12)); g.addColorStop(0.55,faCol(I,0,4)); g.addColorStop(1,faCol(I,-10,28)); }
+    return g; };
+  if(I.kind==="dragon"||I.kind==="eel"){
+    var N=I.kind==="dragon"?16:20, len=L*(I.kind==="dragon"?1.25:1.4), W=L*(I.kind==="dragon"?0.2:0.12);
+    var pts=[]; for(var i=0;i<=N;i++){ var u=i/N; pts.push([len/2-u*len, Math.sin(t*6-u*5)*W*(0.4+u*0.9), W*(1-u*0.82)]); }
+    for(var i=N;i>=0;i--){ var p=pts[i];
+      if(I.kind==="dragon" && i>0 && i<N-1 && i%2===0){ c.fillStyle=faCol(I,40,10); c.beginPath(); c.moveTo(p[0]-3,p[1]-p[2]); c.lineTo(p[0],p[1]-p[2]-W*0.55); c.lineTo(p[0]+3,p[1]-p[2]); c.fill(); }
+      c.fillStyle=I.rainbow?"hsl("+Math.round(i*22)+",85%,58%)":faCol(I,0,(i%2?2:-3)); c.beginPath(); c.arc(p[0],p[1],p[2],0,6.283); c.fill();
+      c.fillStyle=faCol(I,-10,26,0.85); c.beginPath(); c.ellipse(p[0],p[1]+p[2]*0.4,p[2]*0.8,p[2]*0.4,0,0,6.283); c.fill(); }
+    var h=pts[0];
+    c.fillStyle=faCol(I,0,2); c.beginPath(); c.ellipse(h[0]+W*0.6,h[1],W*1.35,W*0.95,0,0,6.283); c.fill();
+    if(I.kind==="dragon"){
+      c.strokeStyle=faCol(I,30,22); c.lineWidth=Math.max(1.5,L*0.04);
+      c.beginPath(); c.moveTo(h[0]-W*0.2,h[1]-W*0.8); c.quadraticCurveTo(h[0]-W*0.9,h[1]-W*2.2,h[0]-W*1.6,h[1]-W*2); c.stroke();
+      c.beginPath(); c.moveTo(h[0]+W*0.2,h[1]-W*0.8); c.quadraticCurveTo(h[0]-W*0.1,h[1]-W*2.3,h[0]-W*0.7,h[1]-W*2.5); c.stroke();
+      c.lineWidth=Math.max(1,L*0.022); c.strokeStyle="#ffe082";
+      c.beginPath(); c.moveTo(h[0]+W*1.8,h[1]+W*0.1); c.quadraticCurveTo(h[0]+W*2.8,h[1]+W*0.8+sw*W*0.3,h[0]+W*3.4,h[1]+W*0.4); c.stroke();
+      c.beginPath(); c.moveTo(h[0]+W*1.7,h[1]+W*0.25); c.quadraticCurveTo(h[0]+W*2.6,h[1]-W*0.5-sw*W*0.3,h[0]+W*3.2,h[1]-W*0.3); c.stroke();
+    }
+    c.fillStyle="#fff"; c.beginPath(); c.arc(h[0]+W*0.9,h[1]-W*0.2,W*0.32,0,6.283); c.fill();
+    c.fillStyle=I.kind==="dragon"?"#d50000":"#111"; c.beginPath(); c.arc(h[0]+W*1.0,h[1]-W*0.2,W*0.18,0,6.283); c.fill();
+  } else if(I.kind==="squid"){
+    var mw=L*0.3, mh=L*0.22;
+    c.strokeStyle=faCol(I,10,6); c.lineWidth=Math.max(1.5,L*0.045);
+    for(var i=0;i<6;i++){ var yy=(i-2.5)*mh*0.34; c.beginPath(); c.moveTo(-L*0.02,yy);
+      c.bezierCurveTo(-L*0.2,yy+Math.sin(t*7+i)*mh*0.5,-L*0.34,yy-Math.sin(t*7+i*1.3)*mh*0.5,-L*0.5,yy+Math.sin(t*6+i)*mh*0.3); c.stroke(); }
+    c.fillStyle=bodyG(mh); c.beginPath(); c.moveTo(L*0.5,0); c.bezierCurveTo(L*0.3,-mh*1.15,-L*0.02,-mh*0.95,-L*0.06,0); c.bezierCurveTo(-L*0.02,mh*0.95,L*0.3,mh*1.15,L*0.5,0); c.fill();
+    c.fillStyle=faCol(I,20,-4); c.beginPath(); c.moveTo(L*0.5,0); c.lineTo(L*0.36,-mh*1.25*Math.max(0.6,1+sw*0.1)); c.lineTo(L*0.3,0); c.lineTo(L*0.36,mh*1.25); c.closePath(); c.fill();
+    c.fillStyle="#fff"; c.beginPath(); c.arc(L*0.08,-mh*0.35,mh*0.32,0,6.283); c.arc(L*0.08,mh*0.35,mh*0.32,0,6.283); c.fill();
+    c.fillStyle="#111"; c.beginPath(); c.arc(L*0.1,-mh*0.35,mh*0.17,0,6.283); c.arc(L*0.1,mh*0.35,mh*0.17,0,6.283); c.fill();
+  } else if(I.kind==="jelly"){
+    var r=L*0.3;
+    c.strokeStyle=faCol(I,20,12,0.85); c.lineWidth=Math.max(1,L*0.03);
+    for(var i=0;i<6;i++){ var xx=-L*0.05-(i-2.5)*0; var yy=(i-2.5)*r*0.34; c.beginPath(); c.moveTo(-r*0.1,yy);
+      c.bezierCurveTo(-L*0.2,yy+Math.sin(t*6+i)*r*0.4,-L*0.3,yy-Math.sin(t*6+i)*r*0.4,-L*0.5,yy+Math.sin(t*5+i*2)*r*0.3); c.stroke(); }
+    var g=c.createRadialGradient(r*0.2,-r*0.3,r*0.1,0,0,r*1.2); g.addColorStop(0,faCol(I,20,28,0.95)); g.addColorStop(1,faCol(I,0,-4,0.8));
+    c.fillStyle=g; c.beginPath(); c.moveTo(-r*0.15,-r*1.0); c.bezierCurveTo(r*1.3,-r*1.0,r*1.3,r*1.0,-r*0.15,r*1.0); c.bezierCurveTo(-r*0.45,r*0.5,-r*0.45,-r*0.5,-r*0.15,-r*1.0); c.fill();
+    c.fillStyle="#fff"; c.beginPath(); c.arc(r*0.45,-r*0.25,r*0.14,0,6.283); c.arc(r*0.45,r*0.25,r*0.14,0,6.283); c.fill();
+  } else {
+    // ===== ปลาทั่วไป / ฉลาม / ฟีนิกซ์ =====
+    var shark=I.kind==="shark", bird=I.kind==="bird";
+    var H=L*(shark?0.24:bird?0.26:[0.32,0.22,0.5,0.46][I.style]), BL=L*(I.style===3&&!shark?0.82:1), tx=-BL*0.34;
+    var tail=Math.sin(t*11)*H*0.35;
+    // ปีกหลัง (ฟีนิกซ์)
+    if(bird){ var fl=Math.sin(t*9);
+      c.fillStyle=faCol(I,30,12,0.9);
+      c.beginPath(); c.moveTo(-L*0.05,-H*0.2); c.quadraticCurveTo(-L*0.3,-H*(2.2+fl),-L*0.5,-H*(1.2+fl*0.6)); c.quadraticCurveTo(-L*0.28,-H*0.7,-L*0.2,-H*0.1); c.fill(); }
+    // หาง
+    c.fillStyle=bird?"hsl(30,100%,55%)":faCol(I,I.rainbow?0:25,6);
+    c.beginPath(); c.moveTo(tx+BL*0.04,0);
+    if(shark){ c.lineTo(-BL*0.52,-H*1.5+tail); c.quadraticCurveTo(-BL*0.4,-H*0.2,-BL*0.4,0.4*H+tail*0.3); c.quadraticCurveTo(-BL*0.45,H*0.7,-BL*0.5,H*0.8+tail); }
+    else if(bird){ c.quadraticCurveTo(-BL*0.45,-H*1.4+tail,-BL*0.62,-H*0.8+tail); c.quadraticCurveTo(-BL*0.5,-H*0.1,-BL*0.7,tail); c.quadraticCurveTo(-BL*0.5,H*0.3,-BL*0.58,H*1.2+tail); c.quadraticCurveTo(-BL*0.42,H*0.6,tx+BL*0.04,0); }
+    else { var fk=I.fin>0.5?1:0.55; c.lineTo(-BL*0.52,-H*0.95*fk-H*0.1+tail); c.quadraticCurveTo(-BL*0.4,-H*0.05,-BL*0.45,tail*0.2); c.quadraticCurveTo(-BL*0.4,H*0.05,-BL*0.52,H*0.95*fk+H*0.1+tail); }
+    c.closePath(); c.fill();
+    // ครีบหลัง
+    c.fillStyle=faCol(I,20,-2);
+    c.beginPath();
+    if(shark){ c.moveTo(-L*0.02,-H*0.62); c.lineTo(-L*0.12,-H*1.9); c.lineTo(-L*0.24,-H*0.5); }
+    else if(I.style===2){ c.moveTo(L*0.22,-H*0.5); c.quadraticCurveTo(L*0.05,-H*1.05,-L*0.26,-H*1.05); c.quadraticCurveTo(-L*0.2,-H*0.7,-L*0.26,-H*0.4); }
+    else { c.moveTo(L*0.2,-H*0.5); c.quadraticCurveTo(L*0.02,-H*(1.05+I.fin*0.4),-L*0.24,-H*0.45); }
+    c.closePath(); c.fill();
+    // ลำตัว
+    c.fillStyle=bodyG(H); c.strokeStyle=ink; c.lineWidth=Math.max(0.8,L*0.02);
+    c.beginPath(); c.moveTo(BL*0.5,shark?H*0.1:0);
+    if(shark){ c.bezierCurveTo(BL*0.3,-H*0.78,-BL*0.1,-H*0.7,tx,-H*0.1); c.lineTo(tx,H*0.1); c.bezierCurveTo(-BL*0.1,H*0.7,BL*0.3,H*0.62,BL*0.5,H*0.1); }
+    else { c.bezierCurveTo(BL*0.32,-H*0.72,-BL*0.18,-H*0.68,tx,-H*0.12); c.lineTo(tx,H*0.12); c.bezierCurveTo(-BL*0.18,H*0.68,BL*0.32,H*0.72,BL*0.5,0); }
+    c.closePath(); c.fill(); c.stroke();
+    // ลายบนลำตัว (clip)
+    c.save(); c.clip();
+    if(I.glass){ c.fillStyle="rgba(255,255,255,0.28)"; c.fillRect(-L,-H,L*2,H*2); }
+    if(shark||bird){ c.fillStyle="rgba(255,255,255,0.85)"; c.beginPath(); c.ellipse(BL*0.1,H*0.62,BL*0.5,H*0.5,0,0,6.283); c.fill(); }
+    c.fillStyle=faCol({hue:I.pcol,sat:80,lit:55},0,0,0.75); c.strokeStyle=faCol({hue:I.pcol,sat:80,lit:55},0,0,0.75); c.lineWidth=Math.max(1,L*0.035);
+    if(!shark&&!bird){
+      if(I.pat===0){ for(var i=0;i<4;i++){ c.beginPath(); c.moveTo(L*(0.2-i*0.14),-H); c.quadraticCurveTo(L*(0.24-i*0.14),0,L*(0.2-i*0.14),H); c.stroke(); } }
+      else if(I.pat===1){ for(var i=0;i<7;i++){ c.beginPath(); c.arc(L*(0.28-i*0.1),(((i*37)%5)-2)*H*0.2,Math.max(1,L*0.03),0,6.283); c.fill(); } }
+      else if(I.pat===2){ c.lineWidth=Math.max(1,L*0.05); c.beginPath(); c.moveTo(BL*0.4,0); c.quadraticCurveTo(0,-H*0.15,tx,0); c.stroke(); }
+    }
+    if(I.dark||I.glass||rarity!=="ธรรมดา"){ c.strokeStyle="rgba(255,255,255,0.35)"; c.lineWidth=Math.max(0.8,L*0.02);
+      for(var i=0;i<5;i++){ c.beginPath(); c.arc(L*(0.12-i*0.1),0,H*0.5,-0.9,0.9); c.stroke(); } }
+    c.restore();
+    // ประกายบนตัว
+    c.fillStyle="rgba(255,255,255,0.45)"; c.beginPath(); c.ellipse(BL*0.05,-H*0.34,BL*0.26,H*0.1,-0.06,0,6.283); c.fill();
+    // ครีบข้าง
+    c.fillStyle=faCol(I,20,8,0.9); c.beginPath(); c.moveTo(L*0.12,H*0.1); c.quadraticCurveTo(-L*0.02,H*0.95+sw*H*0.15,-L*0.12,H*0.3); c.quadraticCurveTo(L*0.0,H*0.15,L*0.12,H*0.1); c.fill();
+    // เหงือก
+    c.strokeStyle="rgba(0,0,0,0.3)"; c.lineWidth=Math.max(0.8,L*0.02); c.beginPath(); c.arc(L*0.2,0,H*0.55,1.9,4.3); c.stroke();
+    // ปาก/ฟัน
+    if(shark){ c.strokeStyle="rgba(0,0,0,0.6)"; c.lineWidth=Math.max(1,L*0.02); c.beginPath(); c.moveTo(BL*0.5,H*0.12); c.quadraticCurveTo(BL*0.36,H*0.4,BL*0.22,H*0.28); c.stroke();
+      c.fillStyle="#fff"; for(var i=0;i<4;i++){ var tx2=BL*(0.46-i*0.06); c.beginPath(); c.moveTo(tx2,H*0.2+i*0.0); c.lineTo(tx2-BL*0.02,H*0.34); c.lineTo(tx2-BL*0.035,H*0.22); c.fill(); } }
+    else { c.strokeStyle="rgba(0,0,0,0.5)"; c.lineWidth=Math.max(0.8,L*0.02); c.beginPath(); c.moveTo(BL*0.5,0); c.lineTo(BL*0.43,H*0.08); c.stroke(); }
+    // ตา
+    var ex=BL*0.3, ey=-H*0.12, er=Math.max(1.6,H*(shark?0.2:0.26));
+    c.fillStyle="#fff"; c.beginPath(); c.arc(ex,ey,er,0,6.283); c.fill();
+    c.fillStyle=bird?"#d50000":"#111"; c.beginPath(); c.arc(ex+er*0.2,ey,er*0.6,0,6.283); c.fill();
+    c.fillStyle="#fff"; c.beginPath(); c.arc(ex+er*0.35,ey-er*0.25,er*0.2,0,6.283); c.fill();
+    // ปีกหน้า (ฟีนิกซ์)
+    if(bird){ var fl2=Math.sin(t*9+1); c.fillStyle=faCol(I,40,20,0.95);
+      c.beginPath(); c.moveTo(L*0.05,-H*0.3); c.quadraticCurveTo(-L*0.2,-H*(2.6+fl2),-L*0.42,-H*(1.6+fl2*0.6)); c.quadraticCurveTo(-L*0.2,-H*0.9,-L*0.12,-H*0.2); c.fill(); }
+    // มงกุฎ/หนามสำหรับ ตำนาน-บอส
+    if(rarity==="ตำนาน"||rarity==="บอส"){ c.fillStyle=rarity==="บอส"?"#ff5252":"#ffd54f"; c.beginPath();
+      var cx=L*0.3, cy=-H*0.62; c.moveTo(cx-L*0.07,cy); c.lineTo(cx-L*0.07,cy-L*0.07); c.lineTo(cx-L*0.035,cy-L*0.03); c.lineTo(cx,cy-L*0.09); c.lineTo(cx+L*0.035,cy-L*0.03); c.lineTo(cx+L*0.07,cy-L*0.07); c.lineTo(cx+L*0.07,cy); c.closePath(); c.fill(); }
+  }
+  c.restore();
+}
+var _faThumb={};
+function fishThumb(name,rarity,known){
+  var k=name+"|"+rarity+"|"+(known?1:0); if(_faThumb[k]) return _faThumb[k];
+  var cv=document.createElement("canvas"); cv.width=132; cv.height=84; var x=cv.getContext("2d");
+  x.translate(66,44); drawFishArt(x,name,rarity,(known?1:1)*72*Math.min(1.25,(FA_SCALE[rarity]||1)*0.8+0.2),0.4);
+  if(!known){ x.setTransform(1,0,0,1,0,0); x.globalCompositeOperation="source-atop"; x.fillStyle="#0b1a2b"; x.fillRect(0,0,132,84);
+    x.globalCompositeOperation="source-over"; x.fillStyle="#90caf9"; x.font="bold 30px sans-serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("?",66,44); }
+  var u=cv.toDataURL("image/png"); _faThumb[k]=u; return u;
+}
+// เล่นเอฟเฟกต์เบ็ดของเพื่อน: สลับค่า global ชั่วคราวให้เป็นของเพื่อน แล้วคืนค่า
+function pfxAs(rod, bx, hy, fn, a, b){
+  var sr=currentRod, sb=boatX, sh=hookY, sq=window.__pfxQuiet;
+  try{ currentRod=rod|0; boatX=bx; hookY=hy; window.__pfxQuiet=true; fn(a,b); }catch(e){}
+  currentRod=sr; boatX=sb; hookY=sh; window.__pfxQuiet=sq;
+}
+function faEase(u){ return 1-(1-u)*(1-u); }
+// age 0..1 : โผล่ขึ้นจากน้ำ -> ลอยโค้งเหนือเรือ -> ค้างโชว์ -> จางหาย
+function fishArtPull(c, name, rarity, hx, y0, age, now, mul, label){
+  var L=36*(FA_SCALE[rarity]||1)*(mul||1), W=62, a=age, t=now/1000;
+  var rc=FA_RC[rarity]; y0=Math.max(70,y0);
+  var x, y, ang, al=1;
+  if(a<0.3){ var u=a/0.3; y=y0+(W-y0)*faEase(u); x=hx; ang=-1.35+Math.sin(t*14)*0.18; }
+  else if(a<0.62){ var u=(a-0.3)/0.32; var e=faEase(u); y=W-(W-(14+L*0.45))*e; x=hx-e*16; ang=-1.35+e*1.05+Math.sin(t*14)*0.12*(1-e); }
+  else { var u=(a-0.62)/0.38; y=14+L*0.45+Math.sin(t*3)*1.6; x=hx-16; ang=-0.3+Math.sin(t*4)*0.06; if(u>0.7) al=1-(u-0.7)/0.3; }
+  c.save(); c.globalAlpha=al;
+  // วงน้ำกระเซ็น
+  if(a>0.12&&a<0.7){ var k=(a-0.12)/0.58; c.strokeStyle="rgba(255,255,255,"+(0.6*(1-k))+")"; c.lineWidth=1.4;
+    c.beginPath(); c.ellipse(hx,W+2,8+k*30,2+k*7,0,0,6.283); c.stroke();
+    c.fillStyle="rgba(255,255,255,"+(0.8*(1-k))+")";
+    for(var i=0;i<7;i++){ var dx=(i-3)*7*k*1.4, dy=-Math.sin(k*Math.PI)*(14+((i*53)%9))+k*8; c.beginPath(); c.arc(hx+dx,W+dy,1.6,0,6.283); c.fill(); } }
+  // ออร่าตามความหายาก
+  if(rc && a>0.25){ var gr=L*(rarity==="บอส"?1.4:1.0), g=c.createRadialGradient(x,y,2,x,y,gr);
+    g.addColorStop(0,rc+"aa"); g.addColorStop(1,rc+"00"); c.fillStyle=g; c.beginPath(); c.arc(x,y,gr,0,6.283); c.fill();
+    if(rarity!=="หายาก"){ c.fillStyle="#fff"; for(var i=0;i<5;i++){ var an=t*2+i*1.26, rr=gr*0.7; c.globalAlpha=al*(0.5+0.5*Math.sin(t*6+i)); c.beginPath(); c.arc(x+Math.cos(an)*rr,y+Math.sin(an)*rr*0.7,1.5,0,6.283); c.fill(); } c.globalAlpha=al; } }
+  c.translate(x,y); c.rotate(ang); drawFishArt(c,name,rarity,L,t);
+  c.restore();
+  // ชื่อปลา
+  if(label && a>0.55){ c.save(); c.globalAlpha=al; c.font="bold 10px sans-serif"; c.textAlign="center";
+    c.lineWidth=3; c.strokeStyle="rgba(0,0,0,0.7)"; var ty=y+L*0.42+11; c.strokeText(name,x,ty); c.fillStyle=rc||"#fff"; c.fillText(name,x,ty); c.restore(); }
+}
+function fishPullStart(name, rarity, y0){
+  FISHANIM.push({name:name, rarity:rarity, t:Date.now(), y0:y0});
+  if(FISHANIM.length>4) FISHANIM.shift();
+  try{ pfxKick(); }catch(e){}
+}
+function fishAnimDraw(){
+  if(!FISHANIM.length) return;
+  var now=Date.now();
+  for(var i=FISHANIM.length-1;i>=0;i--){
+    var f=FISHANIM[i], age=(now-f.t)/2600;
+    if(age>=1){ FISHANIM.splice(i,1); continue; }
+    fishArtPull(ctx,f.name,f.rarity,boatX+14,f.y0,age,now,1.25,true);
+  }
+}
+
 function pfxKick(){
   if(PFX.run) return;
   PFX.run = true; PFX.last = performance.now();
   var step = function(){
-    if(!PFX.list.length || typeof currentUser === "undefined" || !currentUser){ PFX.run = false; return; }
+    if((!PFX.list.length && !FISHANIM.length) || typeof currentUser === "undefined" || !currentUser){ PFX.run = false; return; }
     try{ draw(); }catch(e){}
     requestAnimationFrame(step);
   };
@@ -3483,7 +3683,7 @@ function pfxOne(p, u, fade, dt){
 
 // ---------- ชุดเอฟเฟกต์ของแต่ละเบ็ด (เก็บเอกลักษณ์เดิม: สี/ธีม) ----------
 function pfxSkill(type, label){
-  try{ if(currentRod!==29&&currentRod!==30&&currentRod!==31) SFX.skill(currentRod); }catch(e){}
+  try{ if(!window.__pfxQuiet && currentRod!==29&&currentRod!==30&&currentRod!==31) SFX.skill(currentRod); }catch(e){}
   var id = currentRod, px = boatX + 14, py = hookY + 8, small = (label || "").length <= 5 && id === 39, i, a;
   switch(id){
   case 28: // เทพแห่งขุมนรก: ฟันไฟนรก
@@ -5654,6 +5854,7 @@ function draw(){
   ctx.lineCap = "butt";
   try{ rzFront(currentLoc); }catch(e){}
   drawIslandLight(currentLoc);
+  try{ fishAnimDraw(); }catch(e){}
   if(window.pfxDraw) pfxDraw();
   if(window.mpDrawFriends) mpDrawFriends();
 }
@@ -5892,6 +6093,7 @@ function releaseReel(){
 
 function flashReelSkill(type, label){
   try{ pfxSkill(type, label); }catch(e){}
+  try{ if(window.mpSendFx) mpSendFx(type,label); }catch(e){}
   const bg = document.getElementById('reelBarBg');
   const layer = document.getElementById('skillFxLayer');
   if(!bg) return;
@@ -6760,6 +6962,7 @@ function successCatch(){
     fishPrices[invKey].push(sellPrice);
     stats.totalCaught++;
     if(selected.rarity==="บอส")stats.bossKilled++;
+    try{ fishPullStart(selected.name,selected.rarity,Math.min(hookY,260)); }catch(e){}
     if(window.mpSendCatch) mpSendCatch(selected.name,selected.rarity,weight,sellPrice);
 
     // สารานุกรม
@@ -7763,12 +7966,12 @@ function openBook(){
     fishList.forEach(f=>{
       const caught = caughtBook[f.name];
       if(caught){
-        html += `<div class="item"><div class="item-info">
+        html += `<div class="item"><img src="${fishThumb(f.name,f.rarity,true)}" style="width:66px;height:42px;flex:none;display:block;margin:0 auto 4px"><div class="item-info">
           <div class="item-name">✅ ${tn(f.name)}</div>
           <div class="item-sub">${tr(f.rarity)} | ${msg("ราคา","Price")} ${f.price.toLocaleString()} | ${msg("ดีสุด","Best")} ${caught.bestWeight}kg</div>
         </div></div>`;
       } else {
-        html += `<div class="item"><div class="item-info">
+        html += `<div class="item"><img src="${fishThumb(f.name,f.rarity,false)}" style="width:66px;height:42px;flex:none;display:block;margin:0 auto 4px"><div class="item-info">
           <div class="item-name">❓ ???</div>
           <div class="item-sub">${tr(f.rarity)} | ${msg("ยังไม่เคยจับ","Not caught yet")}</div>
         </div></div>`;
@@ -7780,13 +7983,13 @@ function openBook(){
   html += `<div class="section-title">${currentLang==="en"?"Special Event":"กิจกรรมพิเศษ"}</div>`;
   if(caughtBook["ฉลามเมกาโลดอน"]){
     const c = caughtBook["ฉลามเมกาโลดอน"];
-    html += `<div class="item"><div class="item-info">
+    html += `<div class="item"><img src="${fishThumb("ฉลามเมกาโลดอน","บอส",true)}" style="width:66px;height:42px;flex:none;display:block;margin:0 auto 4px"><div class="item-info">
       <div class="item-name">✅ ${tn("ฉลามเมกาโลดอน")}</div>
       <div class="item-sub">${tr("บอส")} | ${currentLang==="en"?"Best":"ดีสุด"} ${c.bestWeight}kg</div>
     </div></div>`;
     totalCaught++;
   } else {
-    html += `<div class="item"><div class="item-info">
+    html += `<div class="item"><img src="${fishThumb("ฉลามเมกาโลดอน","บอส",false)}" style="width:66px;height:42px;flex:none;display:block;margin:0 auto 4px"><div class="item-info">
       <div class="item-name">❓ ???</div>
       <div class="item-sub">${tr("บอส")} | ${currentLang==="en"?"From Megalodon event":"จากกิจกรรมเมกาโลดอน"}</div>
     </div></div>`;
@@ -8280,7 +8483,7 @@ function drawInvRod(canvas, rodId){
 
 function adEsc(x){ return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 // ===== ระบบแอดมิน (ปลดด้วยโค้ด ADMID) =====
-let adminMode=false, adminKeyOK=false, adminTab=0, adOv=null, adSel={to:"",loc:0,kind:"money",item:"",qty:1,target:"me"}, adPending=null;
+let adminMode=false, adminKeyOK=false, adminTab=0, adOv=null, adSel={to:"",loc:0,kind:"money",item:"",qty:1,target:"me",invTarget:"me",iqty:1,iall:false}, adPending=null;
 function adMP(){ return window.mpAPI||null; }
 function adToast(t){ try{ showMessage(t,2200); }catch(e){} }
 function adminBtnRefresh(){
@@ -8329,6 +8532,41 @@ function adminApplyGive(kind,id,qty){
   try{ saveGame(); updateUI(); }catch(e){}
   return txt;
 }
+let adInv=null;
+function adInvSnapshot(){
+  const o={money:Math.floor(money),rods:[],baits:{},mats:{},bag:{},fish:{}};
+  rods.forEach(r=>{ if(r.owned&&r.id!==0) o.rods.push([r.id,r.name]); });
+  baits.forEach(b=>{ if(b.id!==0&&(b.owned|0)>0) o.baits[b.id]=[tn(b.name),b.owned|0]; });
+  Object.keys(materials).forEach(k=>{ if((materials[k]|0)>0) o.mats[k]=materials[k]|0; });
+  Object.keys(bagItems).forEach(k=>{ if((bagItems[k]|0)>0) o.bag[k]=bagItems[k]|0; });
+  let c=0; Object.keys(inventory).forEach(k=>{ if((inventory[k]|0)>0&&c<160){ c++; const e=fishEntry[k]||{}; o.fish[k]=[inventory[k]|0,e.name||String(k).split("@")[0],e.weight!=null?e.weight:"?",e.price|0,e.rarity||"ธรรมดา"]; } });
+  return o;
+}
+// ลบของออกจากตัวเอง คืนค่าจำนวนที่ลบจริง + ข้อมูลสำหรับหยิบ
+function adInvRemove(sec,key,qty){
+  qty=Math.max(1,Math.floor(Number(qty)||1)); let n=0,label="",info=null,ench=null;
+  if(sec==="money"){ n=Math.min(qty,Math.floor(money)); money-=n; label="💰 เงิน"; }
+  else if(sec==="rod"){ const r=rods[+key]; if(r&&r.owned&&r.id!==0){ n=1; r.owned=false; label="🎣 "+r.name; if(rodEnchants&&rodEnchants[r.id]){ ench=rodEnchants[r.id]; delete rodEnchants[r.id]; } if(currentRod===r.id) currentRod=0; } }
+  else if(sec==="bait"){ const b=baits[+key]; if(b&&b.id!==0){ n=Math.min(qty,b.owned|0); b.owned-=n; label="🪱 "+tn(b.name); if(currentBait===b.id&&b.owned<=0) currentBait=0; } }
+  else if(sec==="mat"){ n=Math.min(qty,materials[key]|0); if(n>0) materials[key]-=n; label="🧱 "+key; }
+  else if(sec==="bag"){ n=Math.min(qty,bagItems[key]|0); if(n>0) bagItems[key]-=n; label="🎒 "+key; }
+  else if(sec==="fish"){ const have=inventory[key]|0; n=Math.min(qty,have);
+    if(n>0){ const e=fishEntry[key]||{}; info={name:e.name||String(key).split("@")[0],weight:e.weight,price:e.price|0,rarity:e.rarity||"ธรรมดา",aurora:!!e.aurora}; label="🐟 "+info.name+" "+info.weight+"kg";
+      inventory[key]=have-n; if(inventory[key]<=0){ delete inventory[key]; delete fishEntry[key]; delete lockedFish[key]; } } }
+  if(n>0){ try{ saveGame(); updateUI(); draw(); }catch(e){} }
+  return {n,label,info,ench};
+}
+function adInvGrant(d){
+  const n=Math.max(0,Math.floor(Number(d.n)||0)); if(!n) return "";
+  const k=String(d.key==null?"":d.key); let lab="";
+  if(d.sec==="money"){ money+=n; lab="💰 "+n.toLocaleString(); }
+  else if(d.sec==="rod"){ const r=rods[+k]; if(!r) return ""; r.owned=true; if(d.ench) rodEnchants[r.id]=d.ench; lab="🎣 "+r.name; }
+  else if(d.sec==="bait"){ const b=baits[+k]; if(!b) return ""; b.owned=(b.owned|0)+n; lab="🪱 "+tn(b.name)+" x"+n; }
+  else if(d.sec==="mat"){ materials[k]=(materials[k]|0)+n; lab="🧱 "+k+" x"+n; }
+  else if(d.sec==="bag"){ bagItems[k]=(bagItems[k]|0)+n; lab="🎒 "+k+" x"+n; }
+  else if(d.sec==="fish"){ inventory[k]=(inventory[k]|0)+n; const f=d.info||{}; if(!fishEntry[k]) fishEntry[k]={name:f.name||k.split("@")[0],weight:f.weight!=null?f.weight:"?",price:f.price|0,rarity:f.rarity||"ธรรมดา",aurora:!!f.aurora}; lab="🐟 "+(f.name||k)+" x"+n; }
+  return lab;
+}
 function adminOnMsg(m){
   if(m.t==="admin_res"){
     if(m.ok&&m.what==="auth"){ adminKeyOK=true; adToast("✅ ยืนยันรหัสแอดมินแล้ว"); }
@@ -8340,6 +8578,22 @@ function adminOnMsg(m){
     adToast("👑 "+(m.by||"แอดมิน")+" ส่งคุณไป "+tn(locations[m.loc]?locations[m.loc].name:"?"));
     const go=()=>{ if(fishingState==="idle"){ adminTravel(m.loc); } else { clearTimeout(adPending); adPending=setTimeout(go,700); } };
     go();
+  } else if(m.t==="admin_inv_req"){
+    const mp0=adMP(); if(mp0) mp0.send({t:"admin_inv_res",data:adInvSnapshot()});
+  } else if(m.t==="admin_item"){
+    const r=adInvRemove(m.sec,m.key,m.qty);
+    const mp1=adMP();
+    if(r&&r.n>0){
+      if(m.op==="take"&&mp1) mp1.send({t:"admin_taken",data:{sec:m.sec,key:m.key,n:r.n,info:r.info,ench:r.ench}});
+      adToast("👑 "+(m.by||"แอดมิน")+(m.op==="take"?" หยิบ ":" ลบ ")+r.label+(r.n>1?" x"+r.n.toLocaleString():""));
+    }
+    if(mp1) mp1.send({t:"admin_inv_res",data:adInvSnapshot()});
+  } else if(m.t==="admin_inv_res"){
+    adInv={id:String(m.from),name:m.name,data:m.data,t:Date.now()}; renderAdmin();
+  } else if(m.t==="admin_taken"){
+    const d=m.data||{}; const lab=adInvGrant(d);
+    if(lab) adToast("🎒 ได้รับจาก "+(m.name||"ผู้เล่น")+": "+lab);
+    try{ saveGame(); updateUI(); }catch(e){} renderAdmin();
   } else if(m.t==="admin_give"){
     const txt=adminApplyGive(m.kind,m.id,m.qty);
     if(txt){ adToast("🎁 "+(m.by||"แอดมิน")+" ให้: "+txt); try{ SFX.sell(); }catch(e){} }
@@ -8356,7 +8610,7 @@ function openAdmin(){
   adOv.style.display="block"; renderAdmin();
 }
 function closeAdmin(){ if(adOv) adOv.style.display="none"; }
-const AD_TABS=["🏝️ วาปไปเกาะ","📍 วาปหาผู้เล่น","🚀 ส่งผู้เล่น","✨ เสกของ"];
+const AD_TABS=["🏝️ วาปไปเกาะ","📍 วาปหาผู้เล่น","🚀 ส่งผู้เล่น","✨ เสกของ","🎒 กระเป๋า"];
 function adPlayers(){ const a=adMP(); return a?a.roster().filter(r=>r.id!==a.myId()):[]; }
 function adLocName(i){ return locations[i]?tn(locations[i].name):("#"+i); }
 function adOpts(arr,sel){ return arr.map(o=>'<option value="'+adEsc(String(o[0]))+'"'+(String(o[0])===String(sel)?' selected':'')+'>'+adEsc(o[1])+'</option>').join(""); }
@@ -8373,6 +8627,31 @@ function adKeyBlock(){
   if(adminKeyOK) return '<div style="color:#a5d6a7;margin-bottom:8px">✅ ยืนยันรหัสแอดมินกับเซิร์ฟเวอร์แล้ว</div>';
   return '<div style="background:#2a1a00;border:1px solid #ff8f00;border-radius:10px;padding:8px;margin-bottom:10px"><div style="font-size:.85rem;margin-bottom:4px">🔑 รหัสแอดมินของเซิร์ฟเวอร์ (ต้องใช้กับการกระทำต่อผู้เล่นอื่น)</div>'+
     '<input id="adKey" type="password" placeholder="ADMIN KEY" value="'+adEsc(sessionStorage.getItem("adk")||"")+'" style="'+AD_IN+'margin-bottom:6px"><button data-act="auth" style="'+AD_BTN+'background:#ef6c00;width:100%">ยืนยันรหัส</button></div>';
+}
+function adInvHTML(pl,mp){
+  let h='ดูกระเป๋าของ<select id="adInvTarget" style="'+AD_IN+'">'+adOpts([["me","ตัวเอง"]].concat(pl.map(r=>[r.id,"ผู้เล่น: "+r.name])),adSel.invTarget||"me")+'</select>';
+  const me=(adSel.invTarget||"me")==="me";
+  let snap;
+  if(me) snap=adInvSnapshot();
+  else {
+    if(!mp||!mp.myId()) return h+'<div style="color:#ff8a80">ต้องเข้าห้องเพื่อนก่อน</div>';
+    h+=adKeyBlock();
+    h+='<button data-act="invload" '+(adminKeyOK?'':'disabled style="opacity:.4;"')+' style="'+AD_BTN+'background:#1565c0;width:100%;margin-bottom:8px">🔄 โหลด/รีเฟรชกระเป๋า</button>';
+    if(!adInv||String(adInv.id)!==String(adSel.invTarget)) return h+'<div style="color:#bcaaa4">ยังไม่ได้โหลด — กด "โหลดกระเป๋า"</div>';
+    snap=adInv.data; if(!snap) return h;
+  }
+  h+='<div style="display:flex;gap:8px;align-items:center;margin:4px 0 8px"><span style="white-space:nowrap">จำนวนต่อครั้ง</span><input id="adIQty" type="number" inputmode="numeric" min="1" value="'+(adSel.iqty||1)+'" style="'+AD_IN+'margin:0"><label style="white-space:nowrap"><input type="checkbox" id="adIAll" '+(adSel.iall?'checked':'')+'> ทั้งหมด</label></div>';
+  const row=(sec,key,label,have)=>'<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 0;border-bottom:1px solid #4e342e"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">'+adEsc(label)+(have!=null?' <span style="color:#bcaaa4">x'+Number(have).toLocaleString()+'</span>':'')+'</span><span style="white-space:nowrap">'+
+    (me?'':'<button data-act="itm" data-op="take" data-sec="'+sec+'" data-key="'+adEsc(String(key))+'" style="'+AD_BTN+'background:#2e7d32;padding:6px 10px">หยิบ</button> ')+
+    '<button data-act="itm" data-op="del" data-sec="'+sec+'" data-key="'+adEsc(String(key))+'" style="'+AD_BTN+'background:#c62828;padding:6px 10px">ลบ</button></span></div>';
+  const head=t=>'<div style="margin:10px 0 2px;color:#ffcc80;font-weight:bold">'+t+'</div>';
+  h+=head("💰 เงิน")+row("money","money","เงิน",snap.money);
+  if(snap.rods&&snap.rods.length){ h+=head("🎣 เบ็ด"); snap.rods.forEach(r=>{ h+=row("rod",r[0],r[1],null); }); }
+  const bk=Object.keys(snap.baits||{}); if(bk.length){ h+=head("🪱 เหยื่อ"); bk.forEach(k=>{ h+=row("bait",k,snap.baits[k][0],snap.baits[k][1]); }); }
+  const mk=Object.keys(snap.mats||{}); if(mk.length){ h+=head("🧱 วัตถุดิบ"); mk.forEach(k=>{ h+=row("mat",k,k,snap.mats[k]); }); }
+  const gk=Object.keys(snap.bag||{}); if(gk.length){ h+=head("🗺️ แผนที่/ของในกระเป๋า"); gk.forEach(k=>{ h+=row("bag",k,k,snap.bag[k]); }); }
+  const fk=Object.keys(snap.fish||{}); if(fk.length){ h+=head("🐟 ปลา"); fk.forEach(k=>{ const f=snap.fish[k]; h+=row("fish",k,f[1]+" "+f[2]+"kg ("+f[4]+")",f[0]); }); }
+  return h;
 }
 function renderAdmin(){
   if(!adOv||adOv.style.display==="none") return;
@@ -8398,6 +8677,8 @@ function renderAdmin(){
       h+='ส่งไปเกาะ<select id="adLoc" style="'+AD_IN+'">'+adOpts(locations.map((l,i)=>[i,adLocName(i)]),adSel.loc)+'</select>';
       h+='<button data-act="send" '+(adminKeyOK&&pl.length?'':'disabled style="opacity:.4;"')+' style="'+AD_BTN+'background:#c62828;width:100%">🚀 ส่งไปเลย</button>';
     }
+  } else if(adminTab===4){
+    h+=adInvHTML(pl,mp);
   } else {
     h+='ให้กับ<select id="adTarget" style="'+AD_IN+'">'+adOpts([["me","ตัวเอง"]].concat(pl.map(r=>[r.id,"ผู้เล่น: "+r.name])),adSel.target)+'</select>';
     if(adSel.target!=="me"){ h+= (mp&&mp.myId())?adKeyBlock():'<div style="color:#ff8a80">ต้องเข้าห้องเพื่อนก่อน</div>'; }
@@ -8413,11 +8694,17 @@ function adReadForm(){
   const g=id=>document.getElementById(id);
   if(g("adTo")) adSel.to=g("adTo").value; if(g("adLoc")) adSel.loc=+g("adLoc").value;
   if(g("adTarget")) adSel.target=g("adTarget").value; if(g("adKind")) adSel.kind=g("adKind").value;
+  if(g("adInvTarget")) adSel.invTarget=g("adInvTarget").value;
+  if(g("adIQty")) adSel.iqty=Math.max(1,Math.floor(Number(g("adIQty").value)||1));
+  if(g("adIAll")) adSel.iall=g("adIAll").checked;
   if(g("adItem")) adSel.item=g("adItem").value; if(g("adQty")) adSel.qty=Math.max(1,Math.floor(Number(g("adQty").value)||1));
 }
 function onAdChange(e){
   const id=e.target.id; if(e.type==="input"&&id!=="adQty"&&id!=="adKey") return;
-  if(id==="adQty"||id==="adKey"){ adReadForm(); return; }
+  if(id==="adQty"||id==="adKey"||id==="adIQty"){ adReadForm(); return; }
+  if(e.type==="input") return;
+  if(id==="adInvTarget"){ adReadForm(); adInv=null; renderAdmin(); const mp2=adMP(); if(adSel.invTarget!=="me"&&adminKeyOK&&mp2) mp2.send({t:"admin_inv_req",to:adSel.invTarget}); return; }
+  if(id==="adIAll"){ adReadForm(); return; }
   adReadForm(); if(id==="adKind") adSel.item=""; renderAdmin();
 }
 function onAdClick(e){
@@ -8430,6 +8717,20 @@ function onAdClick(e){
   if(a==="goto"){ closeAdmin(); return void adminTravel(+el.getAttribute("data-loc")); }
   if(a==="auth"){ const k=(document.getElementById("adKey")||{}).value||""; try{ sessionStorage.setItem("adk",k); }catch(e2){} if(mp) mp.send({t:"admin_auth",key:k}); return; }
   if(a==="send"){ if(mp&&adSel.to) mp.send({t:"admin_send",to:adSel.to,loc:adSel.loc}); return; }
+  if(a==="invload"){ if(mp&&adSel.invTarget&&adSel.invTarget!=="me") mp.send({t:"admin_inv_req",to:adSel.invTarget}); return; }
+  if(a==="itm"){
+    const op=el.getAttribute("data-op"), sec=el.getAttribute("data-sec"), key=el.getAttribute("data-key");
+    const me=(adSel.invTarget||"me")==="me";
+    const qty=adSel.iall?1e15:(sec==="rod"?1:(adSel.iqty||1));
+    if(me){
+      if(!confirm("ลบ "+(adSel.iall&&sec!=="rod"?"ทั้งหมด":"")+" ออกจากกระเป๋าตัวเอง?")) return;
+      const r=adInvRemove(sec,key,qty); adToast(r&&r.n>0?("🗑️ ลบ "+r.label+(r.n>1?" x"+r.n.toLocaleString():"")):"ไม่มีของนี้"); renderAdmin();
+    } else if(mp&&adminKeyOK){
+      if(op==="del"&&!confirm("ลบของของผู้เล่นคนนี้?")) return;
+      mp.send({t:"admin_item",to:adSel.invTarget,op:op,sec:sec,key:key,qty:qty});
+    }
+    return;
+  }
   if(a==="give"){
     const kind=adSel.kind, id=adSel.item, qty=(kind==="rod"||kind==="god")?1:adSel.qty;
     if(adSel.target==="me"){ const t=adminApplyGive(kind,id,qty); adToast(t?("✨ ได้รับ "+t):"เสกไม่สำเร็จ"); try{ SFX.sell(); }catch(e2){} renderAdmin(); }
@@ -9134,7 +9435,7 @@ applyUILanguage();
 
   function onMsg(m){
     switch(m.t){
-      case "admin_res": case "admin_send": case "admin_give":
+      case "admin_res": case "admin_send": case "admin_give": case "admin_inv_req": case "admin_item": case "admin_inv_res": case "admin_taken":
         if(window.adminOnMsg) window.adminOnMsg(m); break;
       case "trade_inv": case "trade_sent": case "trade_open": case "trade_state": case "trade_go": case "trade_done": case "trade_end":
         tradeOnMsg(m); break;
@@ -9156,12 +9457,20 @@ applyUILanguage();
         refreshUI(); break;
       case "pos":
         var o=others[m.id]; if(o){ o.tx=m.bx; o.loc=m.loc; if(m.rod!=null){ o.rod=m.rod|0; o.st=m.st|0; o.hy=m.hy||55; } } break;
+      case "fx":
+        var fo2=others[m.id];
+        if(fo2&&m.id!==myId&&fo2.loc===currentLoc&&fo2.sx!=null){
+          var nw=Date.now(); if(fo2.lastFx&&nw-fo2.lastFx<140) break; fo2.lastFx=nw;
+          pfxAs(fo2.rod,fo2.sx,fo2.shy||fo2.hy||120,pfxSkill,String(m.type||""),String(m.label||""));
+        }
+        break;
       case "chat":
         addLog('<div><b style="color:'+(m.id===myId?"#ffd54f":"#4fc3f7")+'">'+esc(m.from)+':</b> '+esc(m.text)+'</div>',m.id!==myId); break;
       case "sys":
         addLog('<div style="color:#90a4ae">'+esc(m.text)+'</div>'); break;
       case "catch":
-        if(m.id!==myId&&others[m.id]) others[m.id].fx={t:Date.now(),rarity:m.rarity,fish:m.fish};
+        if(m.id!==myId&&others[m.id]&&others[m.id].loc===currentLoc&&others[m.id].sx!=null){ var fo=others[m.id]; pfxAs(fo.rod,fo.sx,fo.shy||fo.hy||120,pfxFinale); }
+        if(m.id!==myId&&others[m.id]) others[m.id].fx={t:Date.now(),rarity:m.rarity,fish:m.fish,y0:Math.min(others[m.id].shy||others[m.id].hy||120,260)};
         if(m.rarity==="ธรรมดา") break;
         var icon={"หายาก":"🔷","มหากาพย์":"🟣","ตำนาน":"🌟","บอส":"👹"}[m.rarity]||"🐟";
         var who=(m.id===myId)?T("คุณ","You"):m.from;
@@ -9236,20 +9545,11 @@ applyUILanguage();
     } else if(st===ST_AIM){
       ctx.fillStyle="rgba(255,255,255,0.8)"; ctx.font="bold 9px sans-serif"; ctx.textAlign="center"; ctx.fillText("…",x+2,16);
     }
-    // ฟองปลาที่จับได้
+    // ปลาที่เพื่อนจับได้ (ภาพปลาถูกดึงขึ้นจากน้ำ)
     if(o.fx){
-      var age=(now-o.fx.t)/1400;
+      var age=(now-o.fx.t)/2600;
       if(age>=1) o.fx=null;
-      else {
-        var fy=60-Math.sin(age*Math.PI)*58, fx=hx-4+age*10;
-        ctx.globalAlpha=1-Math.max(0,age-0.7)/0.3;
-        ctx.font="16px sans-serif"; ctx.textAlign="center"; ctx.fillText("🐟",fx,fy);
-        ctx.strokeStyle="rgba(255,255,255,"+(0.6*(1-age))+")"; ctx.lineWidth=1.4;
-        ctx.beginPath(); ctx.ellipse(hx,63,6+age*26,2+age*7,0,0,6.283); ctx.stroke();
-        var rc2={"หายาก":"#4fc3f7","มหากาพย์":"#ce93d8","ตำนาน":"#ffd54f","บอส":"#ff5252"}[o.fx.rarity];
-        if(rc2){ ctx.fillStyle=rc2; ctx.font="bold 9px sans-serif"; ctx.fillText(o.fx.fish,x,6-age*6); }
-        ctx.globalAlpha=1;
-      }
+      else { try{ fishArtPull(ctx,o.fx.fish,o.fx.rarity,hx,o.fx.y0||120,age,now,1,true); }catch(e){} }
     }
     // ป้ายชื่อใต้เรือ
     ctx.save();
@@ -9266,9 +9566,11 @@ applyUILanguage();
       var o=others[list[i]];
       if(o.shy==null) o.shy=o.hy||55;
       o.shy+=((o.hy||55)-o.shy)*0.4;
+      o.sx=SLOTS[i];
       drawFriendBoat(SLOTS[i],o,i,now);
     }
   };
+  window.mpSendFx=function(type,label){ if(myId) send({t:"fx",type:type,label:String(label||"").slice(0,12)}); };
   window.mpSendCatch=function(fish,rarity,weight,price){
     send({t:"catch",fish:fish,rarity:rarity,weight:weight,price:price});
   };

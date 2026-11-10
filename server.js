@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 const GAME_FILE = path.join(__dirname, 'index.html');
 const MAX_ROOMS = 200;
 const MAX_PLAYERS = 20;
-const MAX_FRAME = 16 * 1024;
+const MAX_FRAME = 64 * 1024;
 
 const rooms = new Map(); // code -> { players: Map(id -> player), dirty: bool }
 let nextId = 1;
@@ -293,12 +293,32 @@ function adminMsg(p, room, m) {
     }
     return;
   }
+  // คำตอบจากผู้เล่นที่ถูกแอดมินขอดูกระเป๋า/หยิบของ (ส่งต่อให้แอดมินที่ขอไว้เท่านั้น)
+  if (m.t === 'admin_inv_res' || m.t === 'admin_taken') {
+    const rq = p.adminReq;
+    if (!rq || now - rq.t > 30000) return;
+    const adm = room.players.get(rq.id) || [...room.players.values()].find(x => String(x.id) === String(rq.id));
+    if (!adm || !adm.admin) return;
+    const data = JSON.stringify(m.data == null ? null : m.data);
+    if (data.length > 50000) return;
+    wsSend(adm.sock, { t: m.t, from: p.id, name: p.name, data: m.data });
+    return;
+  }
   if (!p.admin) { wsSend(p.sock, { t: 'admin_res', ok: false, why: 'noauth' }); return; }
   const to = findPlayer(room, String(m.to || ''));
   if (!to) { wsSend(p.sock, { t: 'admin_res', ok: false, why: 'noplayer' }); return; }
   if (m.t === 'admin_send') {
     wsSend(to.sock, { t: 'admin_send', loc: int(m.loc, 0, 14, 0), by: p.name });
     wsSend(p.sock, { t: 'admin_res', ok: true, what: 'send', name: to.name });
+  } else if (m.t === 'admin_inv_req') {
+    to.adminReq = { id: p.id, t: now };
+    wsSend(to.sock, { t: 'admin_inv_req', by: p.name });
+  } else if (m.t === 'admin_item') {
+    const op = m.op === 'take' ? 'take' : 'del';
+    const sec = ['money', 'rod', 'bait', 'mat', 'bag', 'fish'].indexOf(m.sec) >= 0 ? m.sec : null;
+    if (!sec) return;
+    to.adminReq = { id: p.id, t: now };
+    wsSend(to.sock, { t: 'admin_item', op, sec, key: cleanKey(m.key == null ? '' : m.key), qty: Math.floor(Math.min(1e15, Math.max(1, Number(m.qty) || 1))), by: p.name });
   } else if (m.t === 'admin_give') {
     const kind = ['money', 'rod', 'bait', 'mat', 'bag', 'level', 'god'].indexOf(m.kind) >= 0 ? m.kind : null;
     if (!kind) return;
@@ -345,6 +365,14 @@ function handleMessage(p, m) {
       p.st = int(m.st, 0, 6, 0); p.hy = int(m.hy, 0, 400, 55); p.rod = int(m.rod, 0, 99, 0);
       broadcast(room, { t: 'pos', id: p.id, bx: p.bx, loc: p.loc, st: p.st, hy: p.hy, rod: p.rod }, p.id);
       if (changed) pushPlayers(room);
+      break;
+    }
+    case 'fx': {
+      if (now - (p.lastFx || 0) < 120) return;
+      p.lastFx = now;
+      const type = String(m.type || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 16);
+      const label = String(m.label || '').replace(/[\u0000-\u001f<>]/g, '').slice(0, 12);
+      broadcast(room, { t: 'fx', id: p.id, type, label }, p.id);
       break;
     }
     case 'chat': {
