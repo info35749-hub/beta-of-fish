@@ -10,6 +10,7 @@ const GAME_FILE = path.join(__dirname, 'index.html');
 const MAX_ROOMS = 200;
 const MAX_PLAYERS = 20;
 const MAX_FRAME = 64 * 1024;
+const ADMIN_ONLY_RODS = new Set([50]); // เบ็ด ADMID: เสก/ลบได้เฉพาะแอดมิน ห้ามแลก ห้ามส่งให้ผู้เล่นอื่น
 
 const rooms = new Map(); // code -> { players: Map(id -> player), dirty: bool }
 let nextId = 1;
@@ -143,7 +144,7 @@ function sanitizeOffer(o) {
   if (Number.isFinite(money) && money > 0) offer.money = Math.min(money, 1e13);
   if (Array.isArray(o.rods)) {
     const seen = new Set();
-    for (const r of o.rods.slice(0, 60)) { const id = int(r, 0, 999, -1); if (id >= 0 && !seen.has(id)) { seen.add(id); offer.rods.push(id); } }
+    for (const r of o.rods.slice(0, 60)) { const id = int(r, 0, 999, -1); if (id >= 0 && !seen.has(id) && !ADMIN_ONLY_RODS.has(id)) { seen.add(id); offer.rods.push(id); } }
   }
   offer.baits = cleanCounts(o.baits, 20);
   offer.mats = cleanCounts(o.mats, 30);
@@ -322,6 +323,7 @@ function adminMsg(p, room, m) {
   } else if (m.t === 'admin_give') {
     const kind = ['money', 'rod', 'bait', 'mat', 'bag', 'level', 'god'].indexOf(m.kind) >= 0 ? m.kind : null;
     if (!kind) return;
+    if (kind === 'rod' && ADMIN_ONLY_RODS.has(parseInt(m.id, 10))) { wsSend(p.sock, { t: 'admin_res', ok: false, why: 'adminrod' }); return; }
     wsSend(to.sock, { t: 'admin_give', kind, id: cleanKey(m.id == null ? '' : m.id), qty: Math.floor(Math.min(1e12, Math.max(1, Number(m.qty) || 1))), by: p.name });
     wsSend(p.sock, { t: 'admin_res', ok: true, what: 'give', name: to.name });
   }

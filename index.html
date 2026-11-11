@@ -1223,6 +1223,11 @@ const SFX = {
       for(let i = 0; i < 8; i++) crackle(0.06, 2500, 7000);
       tone(70, 0.5, {slide:40, vol:0.2, delay:0.1});
       break;
+    case 50: // 👑 ADMID: แตรราชันย์ + ระฆังไล่เสียง
+      hit(0.35, {kind:"pink", type:"bandpass", freq:900, sweep:9000, q:2, vol:0.12, attack:0.04});
+      tone(110, 0.6, {slide:220, vol:0.18});
+      [1047, 1319, 1568, 2093, 2637].forEach((f, k) => bell(f, 0.07, {delay:0.05 + k*0.07, wet:0.7, len:1.2}));
+      break;
     case 39: // วงล้อ
       for(let i = 0; i < 8; i++) _click(0.05, 2500 + i*30, i*(0.05 + i*0.02));
       bell(1319, 0.07, {delay:0.9, wet:0.6});
@@ -1877,7 +1882,9 @@ const rods=[
   {id:46,name:"Ruinous Oath",price:85000000,luck:160,mult:5.6,maxWeight:999999,owned:false,locOnly:11,reel:40},
   {id:47,name:"Luminescent Oath",price:80000000,luck:150,mult:5.5,maxWeight:999999,owned:false,locOnly:6,reel:40},
   {id:48,name:"Zenith",price:250000000,luck:400,mult:6.0,maxWeight:999999,owned:false,craftOnly:true,reqLevel:1000,reel:30},
-  {id:49,name:"Prismatic Infinity",price:120000000,luck:450,mult:6.6,maxWeight:1e12,owned:false,locOnly:12,reel:25}
+  {id:49,name:"Prismatic Infinity",price:120000000,luck:450,mult:6.6,maxWeight:1e12,owned:false,locOnly:12,reel:25},
+  // 👑 เบ็ดแอดมิน: เสก/ลบได้เฉพาะโหมด ADMID (ไม่ขายในร้าน ไม่คราฟ ไม่แลก ไม่ส่งให้ผู้เล่นอื่น)
+  {id:50,name:"ADMID Sovereign",price:0,luck:9999,mult:15,maxWeight:1e15,owned:false,adminOnly:true,reel:100}
 ];
 
 const baits=[
@@ -2032,6 +2039,7 @@ function getTotalFish(){return Object.values(inventory).reduce((s,n)=>s+n,0)}
 let _msgTimer=null;
 function showMessage(t,d=1800){messageEl.textContent=t;messageEl.style.display='block';if(_msgTimer)clearTimeout(_msgTimer);_msgTimer=setTimeout(()=>messageEl.style.display='none',d)}
 function updateUI(){
+  try{ admidRefresh(); }catch(e){}
   moneyEl.textContent=money;bagInfoEl.textContent=`${t("bag")}:${getTotalFish()}/${maxBag}`;
   locNameEl.textContent=tn(locations[currentLoc]?locations[currentLoc].name:"");
   rodNameEl.textContent=tn(rods[currentRod]?rods[currentRod].name:"");
@@ -3276,9 +3284,9 @@ function drawRodFX(g, hx, id, rc){
 
 // ===== เอฟเฟกต์สกิลเบ็ดแบบใหม่ (พาร์ติเคิลบนแคนวาส) =====
 var PFX = {list: [], last: 0, run: false};
-var PFX_COL = {28:"255,80,20",29:"79,195,247",30:"255,215,90",31:"255,109,0",39:"255,100,200",40:"64,196,255",41:"255,40,70",42:"255,170,40",43:"255,230,150",44:"120,190,255",45:"186,104,255",46:"255,50,70",47:"170,235,255",48:"255,215,0",49:"200,230,255"};
+var PFX_COL = {28:"255,80,20",29:"79,195,247",30:"255,215,90",31:"255,109,0",39:"255,100,200",40:"64,196,255",41:"255,40,70",42:"255,170,40",43:"255,230,150",44:"120,190,255",45:"186,104,255",46:"255,50,70",47:"170,235,255",48:"255,215,0",49:"200,230,255",50:"255,213,79"};
 var _ZEN_COLS = ["141,110,99","255,215,0","255,109,0","255,224,130","21,101,192","198,40,40","64,196,255","255,23,68","0,229,255","198,40,40"];
-var _zenI = 0;
+var _zenI = 0, _admI = 0;
 function _pr(a, b){ return a + Math.random()*(b - a); }
 function _pick(a){ return a[Math.floor(Math.random()*a.length)]; }
 
@@ -3803,6 +3811,20 @@ function pfxSkill(type, label){
     pfxBurst(px, py, 14, "255,255,255", 170);
     for(i = 0; i < 7; i++) pfxStar(px + _pr(-44, 44), py + _pr(-46, 10), _pr(6, 13), RB[i], _pr(0.45, 0.9), {delay:_pr(0, 0.25), rot:_pr(0, 1)});
     break; }
+  case 50: { // 👑 ADMID Sovereign: ลำแสงราชันย์ วงแหวนรุ้ง ประกายมงกุฎ
+    var AD = ["255,213,79","255,64,129","64,196,255","118,255,3","224,64,251","255,109,0","255,255,255"];
+    var ac = AD[_admI++ % AD.length];
+    pfxBeam(px, 0, py, 26, ac, 0.5);
+    pfxBeam(px - 22, 0, py, 9, AD[(_admI + 2) % AD.length], 0.32);
+    pfxBeam(px + 22, 0, py, 9, ac, 0.36);
+    pfxFlash(px, py, 64, ac, 0.34);
+    for(i = 0; i < 4; i++) pfxRing(px, py, AD[(_admI + i) % AD.length], {grow:90 + i*38, life:0.55 + i*0.05, squash:0.42, w:4 - i*0.5, delay:i*0.06});
+    pfxBurst(px, py, 30, ac, 260, {g:40});
+    pfxBurst(px, py, 8, "255,255,255", 170);
+    pfxSlash(px, py, _pr(-1.2, -0.2), 130, ac, {w:14, curve:0.3, life:0.42});
+    pfxSlash(px, py, _pr(1.9, 2.9), 110, "255,255,255", {w:7, curve:-0.3, life:0.38, delay:0.05});
+    for(i = 0; i < 7; i++) pfxStar(px + _pr(-54, 54), py + _pr(-58, 12), _pr(7, 15), AD[i], _pr(0.5, 1), {delay:_pr(0, 0.3), rot:_pr(0, 1)});
+    break; }
   case 48: { // Zenith: ลำแสงหลากสีตามเบ็ดที่ลอยรอบ
     var zc = _ZEN_COLS[_zenI++ % _ZEN_COLS.length];
     pfxBeam(px, 0, py, 22, zc, 0.42);
@@ -3818,6 +3840,16 @@ function pfxSkill(type, label){
 function pfxFinale(){
   var col = PFX_COL[currentRod]; if(!col) return;
   var px = boatX + 14, py = hookY + 8, i;
+  if(currentRod === 50){ // 👑 ADMID: ฉลองใหญ่
+    var ADF = ["255,213,79","255,64,129","64,196,255","118,255,3","224,64,251","255,109,0"];
+    pfxBeam(px, 0, py, 30, "255,213,79", 0.6);
+    pfxFlash(px, py, 90, "255,225,130", 0.42);
+    for(i = 0; i < 6; i++) pfxRing(px, py, ADF[i], {grow:120 + i*48, life:0.7 + i*0.06, w:5 - i*0.5, squash:0.45, delay:i*0.07});
+    for(i = 0; i < 14; i++) pfxStar(px + _pr(-80, 80), py + _pr(-90, 20), _pr(8, 18), i % 2 ? "255,255,255" : ADF[i % 6], _pr(0.6, 1.2), {delay:_pr(0, 0.45), rot:_pr(0, 1)});
+    pfxBurst(px, py, 36, "255,213,79", 300, {g:90, life:1.1});
+    pfxBurst(px, py, 10, "255,255,255", 220, {life:0.9});
+    return;
+  }
   pfxFlash(px, py, 72, col, 0.55);
   pfxRing(px, py, col, {grow:170, life:0.7, w:4.5, squash:0.45});
   pfxRing(px, py, "255,255,255", {grow:110, life:0.55, w:2, squash:0.45, delay:0.08});
@@ -4061,11 +4093,13 @@ var ROD_COLORS = [
     {rod:"#ff1744", line:"#ff8a80", hook:"#ffeb3b", glow:"#ff5252"},      // 46 Ruinous Oath
     {rod:"#90caf9", line:"#e3f2fd", hook:"#00e5ff", glow:"#40c4ff"},      // 47 Luminescent Oath
     {rod:"#ce93d8", line:"#e1bee7", hook:"#fff", glow:"#b388ff"},           // 48 Zenith
-    {rod:"#b2ebf2", line:"#e0f7fa", hook:"#fff", glow:"#80d8ff"}            // 49 Prismatic Infinity (สีวิ่งตามเวลา)
+    {rod:"#b2ebf2", line:"#e0f7fa", hook:"#fff", glow:"#80d8ff"},            // 49 Prismatic Infinity (สีวิ่งตามเวลา)
+    {rod:"#ffd54f", line:"#fff59d", hook:"#ff4081", glow:"#ffe082"}            // 50 ADMID Sovereign (สีวิ่งตามเวลา)
   ];
 function getRodColors(id){
   var rc = Object.assign({}, ROD_COLORS[id] || ROD_COLORS[0]);
   if(id===49){ var hh=(Date.now()/12)%360; rc.rod="hsl("+hh+",95%,70%)"; rc.line="hsl("+((hh+120)%360)+",95%,78%)"; rc.hook="#fff"; rc.glow="hsl("+((hh+240)%360)+",100%,72%)"; }
+  if(id===50){ var h5=(Date.now()/9)%360; rc.rod="#ffd54f"; rc.line="hsl("+h5+",100%,78%)"; rc.hook="hsl("+((h5+180)%360)+",100%,70%)"; rc.glow="hsl("+((h5+90)%360)+",100%,72%)"; }
   if(id===39){ var wc=["#e91e63","#ffeb3b","#00e676","#2979ff","#d500f9","#ff6d00","#00e5ff","#ff1744"], k=Math.floor(Date.now()/400)%wc.length;
     rc.rod=wc[k]; rc.line=wc[(k+2)%wc.length]; rc.hook=wc[(k+4)%wc.length]; rc.glow=wc[(k+1)%wc.length]; }
   return rc;
@@ -4077,7 +4111,7 @@ function drawRodSet(_rid, bx, hY, rc){
   const rodId = currentRod;
 
   // เรืองแสงพื้นฐาน
-  if(rc.glow && !ROD_STYLE[rodId] && rodId!==28 && rodId!==29 && rodId!==30 && rodId!==31 && rodId!==40 && rodId!==41 && rodId!==42 && rodId!==43 && rodId!==44 && rodId!==45 && rodId!==46 && rodId!==47 && rodId!==48 && rodId!==49 && rodId!==39){
+  if(rc.glow && !ROD_STYLE[rodId] && rodId!==28 && rodId!==29 && rodId!==30 && rodId!==31 && rodId!==40 && rodId!==41 && rodId!==42 && rodId!==43 && rodId!==44 && rodId!==45 && rodId!==46 && rodId!==47 && rodId!==48 && rodId!==49 && rodId!==50 && rodId!==39){
     ctx.strokeStyle = rc.glow;
     ctx.lineWidth = 9;
     ctx.globalAlpha = 0.2;
@@ -4281,6 +4315,88 @@ function drawRodSet(_rid, bx, hY, rc){
       ctx.beginPath(); ctx.arc(hx, hookY, 5, 0, Math.PI*2); ctx.fill();
       ctx.globalAlpha=1;
     }
+  } else if(rodId===50){
+    // 👑 ADMID Sovereign — คทาราชันย์ทอง ปีกเทพ มงกุฎลอย แหวนรุ้ง ออร์บโคจร
+    const T=Date.now()/1000;
+    const hue=(k,l)=>"hsl("+(((T*70)+k)%360)+",100%,"+(l==null?64:l)+"%)";
+    ctx.save();
+    // ออร่าด้านหลัง + ลำแสงหมุนรอบเพชรกลาง
+    ctx.globalCompositeOperation="lighter";
+    const pulse=0.75+0.25*Math.sin(T*3);
+    const ag=ctx.createRadialGradient(hx,18,2,hx,18,40*pulse);
+    ag.addColorStop(0,"rgba(255,236,150,0.65)"); ag.addColorStop(0.45,"rgba(255,64,129,0.22)"); ag.addColorStop(1,"rgba(64,196,255,0)");
+    ctx.fillStyle=ag; ctx.beginPath(); ctx.arc(hx,18,40*pulse,0,Math.PI*2); ctx.fill();
+    for(let k=0;k<8;k++){
+      const a=T*0.9+k*Math.PI/4, L=26+5*Math.sin(T*4+k);
+      const lg=ctx.createLinearGradient(hx,15,hx+Math.cos(a)*L,15+Math.sin(a)*L);
+      lg.addColorStop(0,hue(k*45,70)); lg.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.strokeStyle=lg; ctx.globalAlpha=0.38; ctx.lineWidth=2.2;
+      ctx.beginPath(); ctx.moveTo(hx,15); ctx.lineTo(hx+Math.cos(a)*L,15+Math.sin(a)*L); ctx.stroke();
+    }
+    ctx.globalAlpha=1; ctx.globalCompositeOperation="source-over";
+    // ก้านทองไล่เงา + ลายเกลียวแดงไหลตามก้าน
+    const sg=ctx.createLinearGradient(hx-4,0,hx+4,0);
+    sg.addColorStop(0,"#6d4c00"); sg.addColorStop(0.35,"#fff59d"); sg.addColorStop(0.6,"#ffca28"); sg.addColorStop(1,"#5d4037");
+    ctx.fillStyle="rgba(30,10,0,0.6)"; ctx.fillRect(hx-4.6,17,9.2,19);
+    ctx.fillStyle=sg; ctx.fillRect(hx-3.2,17,6.4,19);
+    ctx.strokeStyle="#d50000"; ctx.lineWidth=1.1;
+    for(let k=0;k<5;k++){
+      const yy=19+((k*4+T*12)%17);
+      ctx.beginPath(); ctx.moveTo(hx-3.2,yy); ctx.lineTo(hx+3.2,yy-2.2); ctx.stroke();
+    }
+    // กริ๊ปแดง + แถบทอง + ปลายด้าม
+    ctx.fillStyle="#7f0000"; ctx.fillRect(hx-3.8,27,7.6,9);
+    ctx.fillStyle="#ffd54f"; for(let k=0;k<3;k++) ctx.fillRect(hx-4.2,27+k*3.2,8.4,1.3);
+    ctx.fillStyle="#ffecb3"; ctx.beginPath(); ctx.arc(hx,36,3.1,0,Math.PI*2); ctx.fill();
+    // ปีกเทพสองข้าง กระพือเบาๆ
+    const fl=Math.sin(T*3.2)*1.8;
+    for(let s=-1;s<=1;s+=2){
+      ctx.fillStyle="#ffd54f"; ctx.strokeStyle="#fff8e1"; ctx.lineWidth=0.8;
+      ctx.beginPath(); ctx.moveTo(hx+s*2.5,21);
+      ctx.quadraticCurveTo(hx+s*13,11+fl,hx+s*20,19+fl*1.4);
+      ctx.quadraticCurveTo(hx+s*12,19+fl,hx+s*16,26+fl);
+      ctx.quadraticCurveTo(hx+s*9,23,hx+s*11,30);
+      ctx.quadraticCurveTo(hx+s*5,27,hx+s*2.5,29);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle="rgba(255,255,255,0.55)"; ctx.lineWidth=0.7;
+      ctx.beginPath(); ctx.moveTo(hx+s*3,22); ctx.lineTo(hx+s*16,20+fl); ctx.moveTo(hx+s*3,25); ctx.lineTo(hx+s*12,25+fl); ctx.stroke();
+    }
+    // เพชรกลางไล่สีรุ้ง
+    const dg=ctx.createLinearGradient(hx-5,10,hx+5,22);
+    dg.addColorStop(0,hue(0,80)); dg.addColorStop(0.5,"#fff"); dg.addColorStop(1,hue(180,60));
+    ctx.fillStyle=dg; ctx.strokeStyle="#fff"; ctx.lineWidth=0.9;
+    ctx.beginPath(); ctx.moveTo(hx,10); ctx.lineTo(hx+5,15.5); ctx.lineTo(hx,22); ctx.lineTo(hx-5,15.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle="rgba(255,255,255,0.6)";
+    ctx.beginPath(); ctx.moveTo(hx-5,15.5); ctx.lineTo(hx+5,15.5); ctx.moveTo(hx,10); ctx.lineTo(hx,22); ctx.stroke();
+    // มงกุฎลอยเหนือเพชร (อยู่ในกรอบแคนวาส)
+    const cb=Math.sin(T*2.4)*1.0, yb=8.6+cb;
+    ctx.fillStyle="#ffca28"; ctx.strokeStyle="#fff8e1"; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.moveTo(hx-7,yb); ctx.lineTo(hx-7,yb-6); ctx.lineTo(hx-3.5,yb-3); ctx.lineTo(hx,yb-7.6); ctx.lineTo(hx+3.5,yb-3); ctx.lineTo(hx+7,yb-6); ctx.lineTo(hx+7,yb); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#d50000"; ctx.fillRect(hx-5.4,yb-2,10.8,1.8);
+    [[-7,-6,0],[0,-7.6,120],[7,-6,240]].forEach(function(g){ ctx.fillStyle=hue(g[2],62); ctx.beginPath(); ctx.arc(hx+g[0],yb+g[1],1.7,0,Math.PI*2); ctx.fill(); });
+    // แหวนรุ้ง 2 วง เอียงหมุน + ออร์บโคจร 6 ดวง
+    ctx.globalCompositeOperation="lighter";
+    for(let r=0;r<2;r++){
+      const rg=ctx.createLinearGradient(hx-20,0,hx+20,0);
+      for(let k=0;k<=5;k++) rg.addColorStop(k/5,hue(k*60+r*90,60));
+      ctx.strokeStyle=rg; ctx.lineWidth=1.6; ctx.globalAlpha=0.9;
+      ctx.beginPath(); ctx.ellipse(hx,19+r*3,18-r*3,4.4,Math.sin(T*1.1+r*2)*0.35+(r?0.5:-0.5),0,Math.PI*2); ctx.stroke();
+    }
+    for(let k=0;k<6;k++){
+      const a=T*2.4+k*Math.PI/3, ox=hx+Math.cos(a)*17, oy=19+Math.sin(a)*6, front=Math.sin(a)>0?1:0.55;
+      const og=ctx.createRadialGradient(ox,oy,0,ox,oy,5);
+      og.addColorStop(0,hue(k*60,85)); og.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.globalAlpha=0.95*front; ctx.fillStyle=og; ctx.beginPath(); ctx.arc(ox,oy,5,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    // ประกายลอยขึ้นตามก้าน
+    for(let k=0;k<8;k++){
+      const tw=Math.max(0,Math.sin(T*5+k*1.7)); if(tw<0.25) continue;
+      const sx=hx+Math.sin(k*2.1+T*0.8)*18, sy=35-((k*9+T*16)%36);
+      ctx.fillStyle="rgba(255,248,200,"+tw+")"; ctx.fillRect(sx-0.6,sy-2.4,1.2,4.8); ctx.fillRect(sx-2.4,sy-0.6,4.8,1.2);
+    }
+    ctx.restore();
+    ctx.globalCompositeOperation="source-over";
   } else if(rodId===49){
     // 🌈 Prismatic Infinity — แท่งปริซึมหลากสี + สัญลักษณ์อนันต์
     const T=Date.now()/1000, hue=(k)=>"hsl("+(((T*55)+k)%360)+",100%,"+(62+Math.sin(T*2+k)*8)+"%)";
@@ -5340,8 +5456,10 @@ function draw(){
     rc.glow = wheelCols[(t+1)%wheelCols.length];
   }
 
+  if(currentRod===50){ Object.assign(rc, getRodColors(50)); }
+
   // เรืองแสงรอบเบ็ด (เบ็ดระดับสูง)
-  if(rc.glow && !ROD_STYLE[currentRod]){
+  if(rc.glow && !ROD_STYLE[currentRod] && currentRod!==50){
     ctx.strokeStyle = rc.glow;
     ctx.lineWidth = 8;
     ctx.globalAlpha = 0.25;
@@ -5967,7 +6085,12 @@ function startBite(){
 
   // สุ่มว่าเป็นบอสหรือไม่
   // เกาะโบราณ (index 8) ตกเมกาโลดอนได้แม้กิจกรรมยังไม่เริ่ม
-  if((megaEventActive && Math.random() < 0.01) || (currentLoc === 8 && Math.random() < 0.18)){
+  const _admFish = admidPickFish();   // 👑 เบ็ด ADMID เลือกปลาได้ทั้งเกม
+  if(_admFish){
+    pendingFish = _admFish;
+    if(_admFish.name === "ฉลามเมกาโลดอน"){ isFightingMega = true; isBossFight = true; }
+    else if(_admFish.rarity === "บอส"){ isBossFight = true; }
+  } else if((megaEventActive && Math.random() < 0.01) || (currentLoc === 8 && Math.random() < 0.18)){
     const megaPrice = Math.floor(50000 + Math.random() * 450000);
     pendingFish = {name:"ฉลามเมกาโลดอน",rarity:"บอส",price:megaPrice,exp:Math.floor(megaPrice/40),chance:0};
     isFightingMega = true;
@@ -6693,6 +6816,20 @@ function startRodSkills(){
       if(reelProgress>=100){ clearInterval(reelTimer); successCatch(); }
     }, 2000);
     skillTimers.push(t);
+  } else if(currentRod===50){
+    // 👑 ADMID Sovereign: ลำแสงราชันย์ทุก 0.28 วิ +45% (จับทันใจ)
+    let ai=0;
+    const t=setInterval(function(){
+      if(fishingState!=="biting") return clearRodSkills();
+      reelProgress=Math.min(100, reelProgress+45);
+      reelBar.style.width=reelProgress+"%";
+      const hc=["#ffd54f","#ff4081","#40c4ff","#76ff03","#e040fb","#ff6d00"][ai%6];
+      ai++;
+      try{ fireZenithBeam(hc); }catch(e){}
+      flashReelSkill('prism', '👑 ADMID +45%');
+      if(reelProgress>=100){ clearInterval(reelTimer); successCatch(); }
+    }, 280);
+    skillTimers.push(t);
   } else if(currentRod===49){
     // Prismatic Infinity: ลำแสงปริซึมทุก 0.45 วิ +34% (ตกปลาไวที่สุด)
     let pi=0;
@@ -6930,7 +7067,7 @@ function successCatch(){
 
   if(selected){
     // ขนาดและน้ำหนัก
-    const sizeMult=0.7+Math.random()*0.9;
+    const sizeMult=(currentRod===50&&adminMode&&admidBig)?1.6:(0.7+Math.random()*0.9);
     let weightNum;
     if(selected.name === "ฉลามเมกาโลดอน"){
       // น้ำหนัก 10,000 - 50,000+ kg
@@ -8100,12 +8237,14 @@ function openInventory(){
     46: msg("ดาบสาบานหายนะ แดงเรือง","Ruinous glowing red oath sword"),
     47: msg("ดาบสาบานเรืองแสง น้ำแข็งฟ้า","Luminescent ice-blue oath sword"),
     48: msg("ดาบเซนิธ การ์ตูน ตาเขียว","Zenith cartoon eye sword"),
-    49: msg("แท่งปริซึมสายรุ้ง ห่วงอนันต์ ∞ หมุนรอบก้าน","Rainbow prism rod with spinning ∞ ring")
+    49: msg("แท่งปริซึมสายรุ้ง ห่วงอนันต์ ∞ หมุนรอบก้าน","Rainbow prism rod with spinning ∞ ring"),
+    50: msg("คทาราชันย์ทอง ปีกเทพ มงกุฎลอย แหวนรุ้ง ออร์บโคจร","Golden sovereign scepter: angel wings, floating crown, rainbow rings, orbiting orbs")
   };
   const rodSkill = {
     29: msg("สกิล: ทุก 2 วิ ค้อนทุบ +30% การดึง","Skill: every 2s hammer +30% reel"),
     30: msg("สกิล: ทุก 1 วิ (5 ครั้ง) ฟัน +10% การดึง","Skill: every 1s (x5) slash +10% reel"),
-    31: msg("สกิล: ทุก 2 วิ หลุมดำดูด +40% การดึง","Skill: every 2s black hole +40% reel")
+    31: msg("สกิล: ทุก 2 วิ หลุมดำดูด +40% การดึง","Skill: every 2s black hole +40% reel"),
+    50: msg("👑 เลือกปลาได้ทั้งเกม (ปุ่ม 🎯) · ตัวใหญ่สุดเสมอ · ทุก 0.28 วิ ลำแสง +45% จับทันใจ","👑 Pick ANY fish in the game (🎯 button) · always max size · every 0.28s beam +45% reel")
   };
 
   let html = "";
@@ -8131,8 +8270,13 @@ function openInventory(){
     html += `<div class="section-title">🎣 ${msg("เบ็ด","Rods")}</div>`;
     html += `<div class="item"><div class="item-info">${msg("ยังไม่มีเบ็ด","No rods yet")}</div></div>`;
   } else {
-    const general = ownedRods.filter(r=>r.locOnly===undefined && !r.secretOnly && !r.reqLevel);
+    const general = ownedRods.filter(r=>r.locOnly===undefined && !r.secretOnly && !r.reqLevel && !r.adminOnly);
     const levelR = ownedRods.filter(r=>r.reqLevel);
+    const admR = ownedRods.filter(r=>r.adminOnly);
+    if(admR.length){
+      html += `<div class="section-title">👑 ${msg("เบ็ดแอดมิน","Admin Rod")}</div>`;
+      admR.forEach(r=>{ html += invRodRow(r); });
+    }
     if(general.length){
       html += `<div class="section-title">🎣 ${msg("เบ็ดทั่วไป","General Rods")}</div>`;
       general.forEach(r=>{ html += invRodRow(r); });
@@ -8439,6 +8583,24 @@ function drawInvRod(canvas, rodId){
     c.beginPath(); c.moveTo(cx,22); c.lineTo(cx,H-8); c.stroke();
     c.fillStyle="#c62828"; c.fillRect(cx-3.5,H-18,7,5);
     c.fillStyle="#ffd700"; c.fillRect(cx-2.5,H-11,5,4);
+  } else if(rodId===50){
+    // 👑 ADMID Sovereign (พรีวิวในกระเป๋า)
+    const T5=Date.now()/1000;
+    const ag=c.createRadialGradient(cx,16,2,cx,16,26);
+    ag.addColorStop(0,"rgba(255,235,130,0.85)"); ag.addColorStop(0.5,"rgba(255,64,129,0.3)"); ag.addColorStop(1,"rgba(64,196,255,0)");
+    c.fillStyle=ag; c.beginPath(); c.arc(cx,16,26,0,Math.PI*2); c.fill();
+    const sg=c.createLinearGradient(cx-4,0,cx+4,0);
+    sg.addColorStop(0,"#8d6e00"); sg.addColorStop(0.5,"#fff59d"); sg.addColorStop(1,"#8d6e00");
+    c.fillStyle=sg; c.fillRect(cx-3,22,6,H-26);
+    c.fillStyle="#b71c1c"; c.fillRect(cx-3.5,H-20,7,12);
+    c.fillStyle="#ffd54f"; for(let i=0;i<3;i++) c.fillRect(cx-4,H-20+i*5,8,1.6);
+    c.fillStyle="#ffd54f";
+    c.beginPath(); c.moveTo(cx-2,24); c.quadraticCurveTo(cx-16,14,cx-20,26); c.quadraticCurveTo(cx-10,24,cx-2,28); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(cx+2,24); c.quadraticCurveTo(cx+16,14,cx+20,26); c.quadraticCurveTo(cx+10,24,cx+2,28); c.closePath(); c.fill();
+    c.fillStyle="#ffca28";
+    c.beginPath(); c.moveTo(cx-9,17); c.lineTo(cx-9,7); c.lineTo(cx-4.5,12); c.lineTo(cx,3); c.lineTo(cx+4.5,12); c.lineTo(cx+9,7); c.lineTo(cx+9,17); c.closePath(); c.fill();
+    c.fillStyle="hsl("+((T5*90)%360)+",100%,65%)"; c.beginPath(); c.arc(cx,13,3,0,Math.PI*2); c.fill();
+    c.fillStyle="#fff"; c.fillRect(cx-0.6,8,1.2,10);
   } else if(rodId===40 || rodId===41){
     const isBlue = rodId===40;
     const main = isBlue ? "#1565c0" : "#b71c1c";
@@ -8523,6 +8685,7 @@ function adminApplyGive(kind,id,qty){
   qty=Math.max(1,Math.floor(Number(qty)||1)); let txt="";
   if(kind==="money"){ money+=qty; txt="💰 "+qty.toLocaleString(); }
   else if(kind==="rod"){ const r=rods[+id]; if(!r) return "";
+    if(r.adminOnly&&!adminMode) return "";
     r.owned=true; txt="🎣 "+r.name; }
   else if(kind==="bait"){ const b=baits[+id]; if(!b) return ""; b.owned=(b.owned|0)+qty; txt="🪱 "+tn(b.name)+" x"+qty; }
   else if(kind==="mat"){ materials[id]=(materials[id]||0)+qty; txt="🧱 "+id+" x"+qty; }
@@ -8560,7 +8723,7 @@ function adInvGrant(d){
   const n=Math.max(0,Math.floor(Number(d.n)||0)); if(!n) return "";
   const k=String(d.key==null?"":d.key); let lab="";
   if(d.sec==="money"){ money+=n; lab="💰 "+n.toLocaleString(); }
-  else if(d.sec==="rod"){ const r=rods[+k]; if(!r) return ""; r.owned=true; if(d.ench) rodEnchants[r.id]=d.ench; lab="🎣 "+r.name; }
+  else if(d.sec==="rod"){ const r=rods[+k]; if(!r) return ""; if(r.adminOnly&&!adminMode) return ""; r.owned=true; if(d.ench) rodEnchants[r.id]=d.ench; lab="🎣 "+r.name; }
   else if(d.sec==="bait"){ const b=baits[+k]; if(!b) return ""; b.owned=(b.owned|0)+n; lab="🪱 "+tn(b.name)+" x"+n; }
   else if(d.sec==="mat"){ materials[k]=(materials[k]|0)+n; lab="🧱 "+k+" x"+n; }
   else if(d.sec==="bag"){ bagItems[k]=(bagItems[k]|0)+n; lab="🎒 "+k+" x"+n; }
@@ -8572,7 +8735,7 @@ function adminOnMsg(m){
     if(m.ok&&m.what==="auth"){ adminKeyOK=true; adToast("✅ ยืนยันรหัสแอดมินแล้ว"); }
     else if(m.ok&&m.what==="send") adToast("🚀 ส่ง "+m.name+" ไปแล้ว");
     else if(m.ok&&m.what==="give") adToast("✨ เสกของให้ "+m.name+" แล้ว");
-    else if(!m.ok){ if(m.why==="noauth") adminKeyOK=false; adToast(m.why==="badkey"?"❌ รหัสแอดมินผิด":m.why==="wait"?"⏳ ลองผิดหลายครั้ง รอ 1 นาที":m.why==="noplayer"?"ไม่พบผู้เล่น":"❌ ต้องยืนยันรหัสแอดมินก่อน"); }
+    else if(!m.ok){ if(m.why==="noauth") adminKeyOK=false; adToast(m.why==="badkey"?"❌ รหัสแอดมินผิด":m.why==="wait"?"⏳ ลองผิดหลายครั้ง รอ 1 นาที":m.why==="noplayer"?"ไม่พบผู้เล่น":m.why==="adminrod"?"👑 เบ็ด ADMID เสกให้ตัวเองได้เท่านั้น":"❌ ต้องยืนยันรหัสแอดมินก่อน"); }
     renderAdmin();
   } else if(m.t==="admin_send"){
     adToast("👑 "+(m.by||"แอดมิน")+" ส่งคุณไป "+tn(locations[m.loc]?locations[m.loc].name:"?"));
@@ -8600,6 +8763,115 @@ function adminOnMsg(m){
   }
 }
 window.adminOnMsg=adminOnMsg;
+
+// ===== 👑 ADMID Sovereign Rod: เบ็ดแอดมิน เลือกปลาได้ทั้งเกม =====
+const ADMID_ROD_ID = 50;
+const ADMID_MEGA = {name:"ฉลามเมกาโลดอน", rarity:"บอส", price:250000, exp:6250, chance:0};
+const ADMID_RAR_COL = {"บอส":"#ff5252","ตำนาน":"#ffd54f","มหากาพย์":"#ce93d8","หายาก":"#4fc3f7","ธรรมดา":"#b0bec5"};
+const ADMID_RAR_ORDER = ["บอส","ตำนาน","มหากาพย์","หายาก","ธรรมดา"];
+let admidTarget = null, admidBig = false, admidOv = null, admidQ = "", admidRar = "all", admidShow = 60, admidList = null;
+try{ const _ap = JSON.parse(localStorage.getItem("admid_pick")||"null"); if(_ap){ admidTarget = (typeof _ap.t==="string")?_ap.t:null; admidBig = !!_ap.b; } }catch(e){}
+function admidSave(){ try{ localStorage.setItem("admid_pick", JSON.stringify({t:admidTarget,b:admidBig})); }catch(e){} }
+// รายชื่อปลาทั้งเกม (ดึงจาก locations อัตโนมัติ + ฉลามเมกาโลดอน)
+function admidAllFish(){
+  if(admidList) return admidList;
+  const seen = new Set(), out = [];
+  locations.forEach(function(l,i){ (l.fish||[]).forEach(function(f){ if(seen.has(f.name)) return; seen.add(f.name); out.push({f:f, loc:i}); }); });
+  if(!seen.has(ADMID_MEGA.name)) out.push({f:ADMID_MEGA, loc:8});
+  const ord = function(r){ const k = ADMID_RAR_ORDER.indexOf(r); return k<0 ? 9 : k; };
+  out.sort(function(a,b){ return (ord(a.f.rarity)-ord(b.f.rarity)) || ((b.f.price||0)-(a.f.price||0)); });
+  admidList = out; return out;
+}
+// ปลาที่เบ็ด ADMID จะเสกให้กัดครั้งถัดไป (null = สุ่มตามปกติ)
+function admidPickFish(){
+  if(currentRod!==ADMID_ROD_ID || !adminMode || !admidTarget) return null;
+  const hit = admidAllFish().find(function(x){ return x.f.name===admidTarget; });
+  if(!hit) return null;
+  const f = Object.assign({}, hit.f);
+  if(f.name===ADMID_MEGA.name){ f.price = Math.floor(50000 + Math.random()*450000); f.exp = Math.floor(f.price/40); }
+  return f;
+}
+// ปุ่ม 🎯 + กันเบ็ดแอดมินค้างในเครื่องที่ไม่ใช่โหมด ADMID
+function admidRefresh(){
+  if(!adminMode){
+    rods.forEach(function(r){ if(r.adminOnly && r.owned) r.owned = false; });
+    if(rods[currentRod] && rods[currentRod].adminOnly) currentRod = 0;
+  }
+  const row = document.querySelector(".btn-row"); let b = document.getElementById("admidBtn");
+  if(adminMode && currentRod===ADMID_ROD_ID){
+    if(!b && row){
+      b = document.createElement("button"); b.className = "btn"; b.id = "admidBtn";
+      b.style.cssText = "background:linear-gradient(180deg,#7c4dff,#ff4081)!important;color:#fff!important;font-weight:bold;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+      row.appendChild(b); b.addEventListener("click", openAdmidPicker);
+    }
+    if(b) b.textContent = admidTarget ? ("🎯 "+tn(admidTarget)) : "🎯 เลือกปลา";
+  } else if(b) b.remove();
+}
+function admidFiltered(){
+  const q = (admidQ||"").trim().toLowerCase();
+  return admidAllFish().filter(function(x){
+    if(admidRar!=="all" && x.f.rarity!==admidRar) return false;
+    if(!q) return true;
+    return x.f.name.toLowerCase().indexOf(q)>=0 || String(tn(x.f.name)).toLowerCase().indexOf(q)>=0;
+  });
+}
+function openAdmidPicker(){
+  if(!adminMode || currentRod!==ADMID_ROD_ID) return;
+  if(!admidOv){
+    admidOv = document.createElement("div"); admidOv.id = "admidOv";
+    admidOv.style.cssText = "position:fixed;inset:0;z-index:80;background:rgba(10,0,20,.86);overflow:auto;-webkit-overflow-scrolling:touch;padding:10px;box-sizing:border-box;color:#fff8e1";
+    document.body.appendChild(admidOv);
+    admidOv.addEventListener("click", admidOnClick);
+    admidOv.addEventListener("input", function(e){ if(e.target.id==="admidSearch"){ admidQ = e.target.value; admidShow = 60; admidRenderList(); } });
+    admidOv.addEventListener("change", function(e){ if(e.target.id==="admidBig"){ admidBig = e.target.checked; admidSave(); admidRefresh(); } });
+  }
+  admidOv.style.display = "block"; admidRenderShell();
+}
+function closeAdmidPicker(){ if(admidOv) admidOv.style.display = "none"; }
+function admidRenderShell(){
+  const cur = admidTarget ? tn(admidTarget) : "สุ่มตามปกติ";
+  let h = '<div style="max-width:520px;margin:0 auto;background:linear-gradient(180deg,#24083a,#12041f);border:2px solid #ffd54f;border-radius:14px;padding:0 12px 12px;box-shadow:0 0 30px #7c4dff88">';
+  h += '<div style="position:sticky;top:0;z-index:3;background:#1b0630;padding:10px 0 6px;display:flex;justify-content:space-between;align-items:center"><b style="font-size:1.1rem;color:#ffd54f">👑 ADMID Sovereign · เลือกปลา</b><span data-a="close" style="cursor:pointer;padding:4px 12px;font-size:1.2rem;background:#c62828;border-radius:16px">✕</span></div>';
+  h += '<div style="font-size:.9rem;margin:2px 0 8px;color:#e1bee7">เป้าหมายตอนนี้: <b style="color:#fff59d">'+adEsc(cur)+'</b></div>';
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><button data-a="rand" style="'+AD_BTN+'background:#455a64">🎲 สุ่มตามปกติ</button><label style="display:flex;align-items:center;gap:6px;font-size:.9rem"><input type="checkbox" id="admidBig"'+(admidBig?' checked':'')+'> 📏 ตัวใหญ่สุดเสมอ</label></div>';
+  h += '<input id="admidSearch" type="search" placeholder="🔍 ค้นหาชื่อปลา" value="'+adEsc(admidQ)+'" style="'+AD_IN+'">';
+  h += '<div id="admidChips" style="display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px"></div><div id="admidListBox"></div></div>';
+  admidOv.innerHTML = h; admidRenderChips(); admidRenderList();
+}
+function admidRenderChips(){
+  const box = document.getElementById("admidChips"); if(!box) return;
+  const all = admidAllFish(); let h = "";
+  const chip = function(key,label,n){ const on = admidRar===key; return '<button data-r="'+adEsc(key)+'" style="flex:none;'+AD_BTN+'padding:6px 11px;font-size:.85rem;background:'+(on?'#ff8f00':'#3e2723')+'">'+adEsc(label)+' ('+n+')</button>'; };
+  h += chip("all","ทั้งหมด",all.length);
+  ADMID_RAR_ORDER.forEach(function(r){ h += chip(r, tr(r), all.filter(function(x){ return x.f.rarity===r; }).length); });
+  box.innerHTML = h;
+}
+function admidRenderList(){
+  const box = document.getElementById("admidListBox"); if(!box) return;
+  const all = admidFiltered(), list = all.slice(0, admidShow); let h = "";
+  list.forEach(function(x){
+    const f = x.f, sel = admidTarget===f.name, col = ADMID_RAR_COL[f.rarity]||"#fff";
+    let th = ""; try{ th = fishThumb(f.name, f.rarity, true); }catch(e){}
+    h += '<div data-n="'+adEsc(f.name)+'" style="display:flex;gap:8px;align-items:center;padding:6px;border-bottom:1px solid #3a1a55;cursor:pointer;border-radius:8px;background:'+(sel?'rgba(255,213,79,.18)':'transparent')+'">'+
+      (th?'<img src="'+th+'" width="66" height="42" style="border-radius:6px;background:#0a1628;flex:none">':'')+
+      '<div style="flex:1;min-width:0"><b style="word-break:break-word">'+adEsc(tn(f.name))+'</b><div style="font-size:.78rem;color:'+col+'">'+adEsc(tr(f.rarity))+' · '+Number(f.price||0).toLocaleString()+' · '+adEsc(adLocName(x.loc))+'</div></div>'+
+      (sel?'<span style="font-size:1.3rem">✅</span>':'')+'</div>';
+  });
+  if(!all.length) h = '<div style="color:#bcaaa4;padding:10px">ไม่พบปลา</div>';
+  if(all.length>list.length) h += '<button data-a="more" style="'+AD_BTN+'background:#4527a0;width:100%;margin-top:8px">แสดงเพิ่ม (เหลืออีก '+(all.length-list.length)+' ตัว)</button>';
+  box.innerHTML = h;
+}
+function admidOnClick(e){
+  const el = e.target.closest ? e.target.closest("[data-a],[data-n],[data-r]") : null; if(!el) return;
+  const a = el.getAttribute("data-a");
+  if(a==="close") return closeAdmidPicker();
+  if(a==="rand"){ admidTarget = null; admidSave(); admidRefresh(); closeAdmidPicker(); try{ showMessage("🎲 ตกปลาแบบสุ่มตามปกติ", 1400); }catch(e2){} return; }
+  if(a==="more"){ admidShow += 60; return admidRenderList(); }
+  const r = el.getAttribute("data-r");
+  if(r!==null){ admidRar = r; admidShow = 60; admidRenderChips(); return admidRenderList(); }
+  const n = el.getAttribute("data-n");
+  if(n!==null){ admidTarget = n; admidSave(); admidRefresh(); closeAdmidPicker(); try{ showMessage("🎯 เป้าหมาย: "+tn(n), 1600); SFX.sell(); }catch(e3){} }
+}
 function openAdmin(){
   if(!adOv){
     adOv=document.createElement("div"); adOv.id="adOv";
@@ -8615,7 +8887,7 @@ function adPlayers(){ const a=adMP(); return a?a.roster().filter(r=>r.id!==a.myI
 function adLocName(i){ return locations[i]?tn(locations[i].name):("#"+i); }
 function adOpts(arr,sel){ return arr.map(o=>'<option value="'+adEsc(String(o[0]))+'"'+(String(o[0])===String(sel)?' selected':'')+'>'+adEsc(o[1])+'</option>').join(""); }
 function adItemList(kind){
-  if(kind==="rod") return rods.map(r=>[r.id,r.id+" · "+r.name+(r.owned?" ✔":"")]);
+  if(kind==="rod") return rods.map(r=>[r.id,r.id+" · "+(r.adminOnly?"👑 ":"")+r.name+(r.owned?" ✔":"")]);
   if(kind==="bait") return baits.map(b=>[b.id,tn(b.name)+" (มี "+(b.owned|0)+")"]);
   if(kind==="mat") return Object.keys(materials).map(k=>[k,k+" (มี "+(materials[k]|0)+")"]);
   if(kind==="bag") return Object.keys(bagItems).map(k=>[k,k+" (มี "+(bagItems[k]|0)+")"]);
@@ -8734,7 +9006,7 @@ function onAdClick(e){
   if(a==="give"){
     const kind=adSel.kind, id=adSel.item, qty=(kind==="rod"||kind==="god")?1:adSel.qty;
     if(adSel.target==="me"){ const t=adminApplyGive(kind,id,qty); adToast(t?("✨ ได้รับ "+t):"เสกไม่สำเร็จ"); try{ SFX.sell(); }catch(e2){} renderAdmin(); }
-    else if(mp){ mp.send({t:"admin_give",to:adSel.target,kind:kind,id:id,qty:qty}); }
+    else if(mp){ if(kind==="rod"&&rods[+id]&&rods[+id].adminOnly){ adToast("👑 เบ็ด ADMID เสกให้ตัวเองได้เท่านั้น"); return; } mp.send({t:"admin_give",to:adSel.target,kind:kind,id:id,qty:qty}); }
     return;
   }
 }
@@ -8846,7 +9118,7 @@ const REDEEM_CODES = {
 function grantGodMode(got){
   money += 1000000000;
   level = 1000; exp = 0; expToNext = 0;
-  rods.forEach(function(r){ if(!r.hidden) r.owned = true; });
+  rods.forEach(function(r){ if(!r.hidden && !r.adminOnly) r.owned = true; });
   baits.forEach(function(b){ b.owned = Math.max(b.owned || 0, 999); });
   for(const k in materials) materials[k] = Math.max(materials[k] || 0, 999);
   bagItems["แผนที่เกาะลับ"] = Math.max(bagItems["แผนที่เกาะลับ"] || 0, 99);
@@ -9061,6 +9333,8 @@ function applyGameState(data){
   if(data.rodsOwned){
     data.rodsOwned.forEach((own, i) => { if(rods[i]) rods[i].owned = !!own; });
     rods[0].owned = true;
+    // เบ็ดแอดมิน: ถ้าไม่ได้อยู่ในโหมด ADMID ให้ถอดออก (กันเซฟที่ถูกแก้/ได้มาทางอื่น)
+    rods.forEach(r=>{ if(r.adminOnly && !adminMode){ r.owned=false; if(currentRod===r.id) currentRod=0; } });
   }
   if(data.baitsOwned){
     data.baitsOwned.forEach((own, i) => { if(baits[i]) baits[i].owned = own; });
@@ -9587,7 +9861,7 @@ applyUILanguage();
   function buildOffer(s){
     var o={money:0,rods:[],baits:{},mats:{},bag:{},fish:{},fishInfo:{},enchants:{}};
     o.money=Math.max(0,Math.min(Math.floor(Number(s.money)||0),Math.floor(money)));
-    Object.keys(s.rods).forEach(function(k){ var id=+k; if(s.rods[k]&&id!==0&&rods[id]&&rods[id].owned){ o.rods.push(id); if(rodEnchants&&rodEnchants[id]) o.enchants[id]=rodEnchants[id]; } });
+    Object.keys(s.rods).forEach(function(k){ var id=+k; if(s.rods[k]&&id!==0&&rods[id]&&rods[id].owned&&!rods[id].adminOnly){ o.rods.push(id); if(rodEnchants&&rodEnchants[id]) o.enchants[id]=rodEnchants[id]; } });
     Object.keys(s.baits).forEach(function(k){ var id=+k,n=Math.min(s.baits[k]|0,baits[id]?(baits[id].owned|0):0); if(id!==0&&n>0) o.baits[k]=n; });
     Object.keys(s.mats).forEach(function(k){ var n=Math.min(s.mats[k]|0,materials[k]|0); if(n>0) o.mats[k]=n; });
     Object.keys(s.bag).forEach(function(k){ var n=Math.min(s.bag[k]|0,bagItems[k]|0); if(n>0) o.bag[k]=n; });
@@ -9607,7 +9881,7 @@ applyUILanguage();
   }
   function canReceive(theirs,mine){
     if(!theirs) return "";
-    for(var i=0;i<theirs.rods.length;i++){ var r=rods[theirs.rods[i]]; if(!r) return T("เบ็ดไม่รู้จัก","Unknown rod"); if(r.owned&&!(mine&&mine.rods.indexOf(theirs.rods[i])>=0)) return T("คุณมี "+r.name+" อยู่แล้ว","You already own "+r.name); }
+    for(var i=0;i<theirs.rods.length;i++){ var r=rods[theirs.rods[i]]; if(!r) return T("เบ็ดไม่รู้จัก","Unknown rod"); if(r.adminOnly) return T("เบ็ดนี้แลกไม่ได้","This rod cannot be traded"); if(r.owned&&!(mine&&mine.rods.indexOf(theirs.rods[i])>=0)) return T("คุณมี "+r.name+" อยู่แล้ว","You already own "+r.name); }
     var k;
     for(k in theirs.baits) if(!baits[+k]) return T("เหยื่อไม่รู้จัก","Unknown bait");
     for(k in theirs.mats) if(materials[k]==null) return T("ชิ้นส่วนไม่รู้จัก","Unknown material");
@@ -9709,7 +9983,7 @@ applyUILanguage();
   function chooserHTML(){
     var h=head("💰 "+T("เงิน","Money")+' <span style="color:#78909c;font-weight:normal">('+fmt(Math.floor(money))+')</span>');
     h+='<input id="trMoney" type="number" min="0" inputmode="numeric" value="'+(sel.money||0)+'" style="width:100%;box-sizing:border-box;padding:6px;border-radius:6px;border:1px solid #ffb74d;background:#06121f;color:#fff">';
-    var rl=rods.filter(function(r){ return r.owned&&r.id!==0; });
+    var rl=rods.filter(function(r){ return r.owned&&r.id!==0&&!r.adminOnly; });
     if(rl.length){ h+=head("🎣 "+T("เบ็ด","Rods"));
       rl.forEach(function(r){ h+='<label style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #1b2e42"><input type="checkbox" data-sec="rods" data-key="'+r.id+'" '+(sel.rods[r.id]?'checked':'')+'> '+esc(r.name)+(rodEnchants&&rodEnchants[r.id]?' ✨':'')+(currentRod===r.id?' <span style="color:#78909c">('+T("ใช้อยู่","equipped")+')</span>':'')+'</label>'; }); }
     var bl=baits.filter(function(b){ return b.id!==0&&(b.owned|0)>0; });
@@ -9761,7 +10035,7 @@ applyUILanguage();
     for(k in mine.fish){ inventory[k]=(inventory[k]|0)-mine.fish[k]; if(inventory[k]<=0){ delete inventory[k]; delete fishEntry[k]; delete lockedFish[k]; } }
     // รับของเพื่อน
     money+=(theirs.money|0);
-    theirs.rods.forEach(function(id){ if(rods[id]){ rods[id].owned=true; if(theirs.enchants&&theirs.enchants[id]) rodEnchants[id]=theirs.enchants[id]; } });
+    theirs.rods.forEach(function(id){ if(rods[id]&&!rods[id].adminOnly){ rods[id].owned=true; if(theirs.enchants&&theirs.enchants[id]) rodEnchants[id]=theirs.enchants[id]; } });
     for(k in theirs.baits) if(baits[+k]) baits[+k].owned=(baits[+k].owned|0)+theirs.baits[k];
     for(k in theirs.mats) materials[k]=(materials[k]|0)+theirs.mats[k];
     for(k in theirs.bag) bagItems[k]=(bagItems[k]|0)+theirs.bag[k];
